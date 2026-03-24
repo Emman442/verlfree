@@ -15,11 +15,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: "Job Verified", description: "Your submission for 'NFT Market' was approved.", time: "2m ago" },
+    { id: 2, title: "New Job Posted", description: "A client posted a job matching your skills.", time: "1h ago" },
+    { id: 3, title: "Payment Received", description: "450 GEN has been released to your wallet.", time: "3h ago" },
+  ]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -68,10 +78,46 @@ export default function Navbar() {
 
         {/* Right Actions */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="relative text-muted-foreground">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative text-muted-foreground">
+                <Bell className="w-5 h-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-background"></span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="p-4 border-b border-border">
+                <h4 className="font-bold">Notifications</h4>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {notifications.length > 0 ? (
+                  notifications.map((n) => (
+                    <div key={n.id} className="p-4 border-b border-border last:border-0 hover:bg-accent/50 transition-colors cursor-default">
+                      <p className="text-sm font-bold">{n.title}</p>
+                      <p className="text-xs text-muted-foreground mb-1">{n.description}</p>
+                      <p className="text-[10px] text-primary/70">{n.time}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-muted-foreground text-sm">
+                    No new notifications
+                  </div>
+                )}
+              </div>
+              <div className="p-2 text-center border-t border-border">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full text-xs hover:text-primary" 
+                  onClick={() => setNotifications([])}
+                >
+                  Clear all
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {connected ? (
             <DropdownMenu>
@@ -136,7 +182,14 @@ export default function Navbar() {
                   {link.name}
                 </Link>
               ))}
-              <Button className="w-full">Connect Wallet</Button>
+              {!connected && (
+                <Button className="w-full" onClick={() => {
+                  setConnected(true);
+                  setMobileMenuOpen(false);
+                }}>
+                  Connect Wallet
+                </Button>
+              )}
             </div>
           </motion.div>
         )}
