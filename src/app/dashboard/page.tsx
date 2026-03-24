@@ -1,13 +1,12 @@
-
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Wallet, Briefcase, CheckCircle2, Clock, Plus } from "lucide-react";
+import { Wallet, Briefcase, CheckCircle2, Clock, Plus, User } from "lucide-react";
 import Link from "next/link";
 
 const mockJobs = [

@@ -1,4 +1,3 @@
-
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
@@ -6,7 +5,7 @@ import Hero from "@/components/landing/Hero";
 import HowItWorks from "@/components/landing/HowItWorks";
 import StatsBar from "@/components/landing/StatsBar";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -119,7 +118,7 @@ export default function Home() {
       </section>
 
       <footer className="py-12 border-t border-border">
-        <div className="container mx-auto px-4 flex flex-col md:row justify-between items-center gap-8 text-sm text-muted-foreground">
+        <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-primary" />
             <span className="font-bold text-foreground">VeriFree</span>
