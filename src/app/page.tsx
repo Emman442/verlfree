@@ -1,3 +1,4 @@
+
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
@@ -9,6 +10,7 @@ import { Check, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -42,7 +44,9 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <Button className="mt-10" size="lg">Start Hiring</Button>
+              <Button asChild className="mt-10" size="lg">
+                <Link href="/post-job">Start Hiring</Link>
+              </Button>
             </motion.div>
 
             <motion.div
@@ -65,8 +69,8 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <Button variant="outline" className="mt-10 border-primary text-primary hover:bg-primary/10" size="lg">
-                Browse Jobs
+              <Button asChild variant="outline" className="mt-10 border-primary text-primary hover:bg-primary/10" size="lg">
+                <Link href="/jobs">Browse Jobs</Link>
               </Button>
             </motion.div>
           </div>
@@ -135,8 +139,4 @@ export default function Home() {
       </footer>
     </main>
   );
-}
-
-function Link({ href, children, className }: any) {
-  return <a href={href} className={className}>{children}</a>;
 }
