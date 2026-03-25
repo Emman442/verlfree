@@ -1,3 +1,4 @@
+
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
@@ -47,9 +48,9 @@ export default function Dashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
           <div>
             <h1 className="text-3xl font-bold mb-2 tracking-tight">
-              Welcome back, {user?.displayName || 'Builder'}
+              Dashboard
             </h1>
-            <p className="text-muted-foreground">Manage your active escrows and track your applications.</p>
+            <p className="text-muted-foreground">Manage your projects, escrows, and applications.</p>
           </div>
           <Button asChild size="lg" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
             <Link href="/post-job">
@@ -89,13 +90,13 @@ export default function Dashboard() {
           <TabsList className="mb-8 bg-muted/50 p-1 flex-wrap h-auto">
             <TabsTrigger value="open" className="px-6 data-[state=active]:bg-background">My Listings</TabsTrigger>
             <TabsTrigger value="active" className="px-6 data-[state=active]:bg-background">Active Projects</TabsTrigger>
-            <TabsTrigger value="completed" className="px-6 data-[state=active]:bg-background">Completed</TabsTrigger>
             <TabsTrigger value="applied" className="px-6 data-[state=active]:bg-background">Applied Jobs</TabsTrigger>
+            <TabsTrigger value="completed" className="px-6 data-[state=active]:bg-background">Completed</TabsTrigger>
           </TabsList>
           
           <div className="mt-4">
             {jobsLoading || appsLoading ? (
-              <div className="p-12 text-center text-muted-foreground animate-pulse">Synchronizing data...</div>
+              <div className="p-12 text-center text-muted-foreground animate-pulse">Synchronizing dashboard...</div>
             ) : (
               <>
                 <TabsContent value="open" className="space-y-4">
@@ -114,17 +115,20 @@ export default function Dashboard() {
                     <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
-                <TabsContent value="completed" className="space-y-4">
-                  {jobs?.filter(j => j.status === 'Completed').map((job, i) => (
-                    <JobRow key={job.id} job={job} index={i} />
-                  ))}
-                </TabsContent>
                 <TabsContent value="applied" className="space-y-4">
                   {applications?.length === 0 && (
                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">You haven't applied to any jobs yet.</div>
                   )}
                   {applications?.map((app, i) => (
                     <ApplicationRow key={app.id} application={app} index={i} db={db} />
+                  ))}
+                </TabsContent>
+                <TabsContent value="completed" className="space-y-4">
+                  {jobs?.filter(j => j.status === 'Completed').length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No completed projects.</div>
+                  )}
+                  {jobs?.filter(j => j.status === 'Completed').map((job, i) => (
+                    <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
               </>
@@ -208,8 +212,8 @@ function JobRow({ job, index }: { job: any; index: number }) {
                   <Clock className="w-4 h-4" />
                   {job.deadline}
                 </span>
-                <span className="flex items-center gap-1">
-                  <Badge className={`h-1.5 w-1.5 rounded-full p-0 bg-${statusColors[job.status]}-500`} />
+                <span className="flex items-center gap-1 capitalize">
+                  <span className={`h-1.5 w-1.5 rounded-full bg-${statusColors[job.status]}-500 mr-2`} />
                   {job.status}
                 </span>
               </div>

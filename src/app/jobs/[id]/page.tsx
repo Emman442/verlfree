@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -29,7 +30,7 @@ import {
   useMemoFirebase,
   updateDocumentNonBlocking
 } from "@/firebase";
-import { doc, collection, query, where } from "firebase/firestore";
+import { doc, collection } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export default function JobDetail() {
@@ -120,7 +121,7 @@ export default function JobDetail() {
     setVerifying(true);
     toast({
       title: "Submitting Deliverable",
-      description: "Triggering GenLayer AI verification node...",
+      description: "Triggering protocol AI verification...",
     });
     
     setTimeout(() => {
@@ -201,7 +202,7 @@ export default function JobDetail() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <AnimatePresence mode="popLayout">
-                    {sortedApplications.length === 0 ? (
+                    {!applications || applications.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">No applications yet.</div>
                     ) : (
                       sortedApplications.map((app) => (
