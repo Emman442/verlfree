@@ -42,21 +42,24 @@ export default function JobDetail() {
   const [isAIReordering, setIsAIReordering] = useState(false);
   const [deliverableUrl, setDeliverableUrl] = useState("");
 
-  // Firestore Data
+  // Firestore Data: Fetch the job document first
   const jobRef = useMemoFirebase(() => {
     if (!db || !id) return null;
     return doc(db, "jobs", id as string);
   }, [db, id]);
   const { data: job, isLoading: jobLoading } = useDoc(jobRef);
 
-  const appsQuery = useMemoFirebase(() => {
-    if (!db || !id) return null;
-    return collection(db, "jobs", id as string, "applications");
-  }, [db, id]);
-  const { data: applications } = useCollection(appsQuery);
-
+  // Authorization checks
   const isClient = user && job && job.clientId === user.uid;
   const isAssignedFreelancer = user && job && job.assignedFreelancerId === user.uid;
+
+  // Gate the applications query: Only clients should attempt to list applications
+  // to avoid "Missing or insufficient permissions" for other users.
+  const appsQuery = useMemoFirebase(() => {
+    if (!db || !id || !user || !job || job.clientId !== user.uid) return null;
+    return collection(db, "jobs", id as string, "applications");
+  }, [db, id, user, job]);
+  const { data: applications } = useCollection(appsQuery);
 
   // AI Shortlist Demo Logic
   const sortedApplications = useMemo(() => {
