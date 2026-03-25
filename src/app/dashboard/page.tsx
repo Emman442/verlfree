@@ -1,4 +1,3 @@
-
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
@@ -100,7 +99,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <TabsContent value="open" className="space-y-4">
-                  {jobs?.filter(j => j.status === 'Open').length === 0 && (
+                  {!jobs?.filter(j => j.status === 'Open').length && (
                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No open listings.</div>
                   )}
                   {jobs?.filter(j => j.status === 'Open').map((job, i) => (
@@ -108,7 +107,7 @@ export default function Dashboard() {
                   ))}
                 </TabsContent>
                 <TabsContent value="active" className="space-y-4">
-                  {jobs?.filter(j => j.status === 'Active').length === 0 && (
+                  {!jobs?.filter(j => j.status === 'Active').length && (
                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No active projects.</div>
                   )}
                   {jobs?.filter(j => j.status === 'Active').map((job, i) => (
@@ -116,7 +115,7 @@ export default function Dashboard() {
                   ))}
                 </TabsContent>
                 <TabsContent value="applied" className="space-y-4">
-                  {applications?.length === 0 && (
+                  {!applications?.length && (
                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">You haven't applied to any jobs yet.</div>
                   )}
                   {applications?.map((app, i) => (
@@ -124,7 +123,7 @@ export default function Dashboard() {
                   ))}
                 </TabsContent>
                 <TabsContent value="completed" className="space-y-4">
-                  {jobs?.filter(j => j.status === 'Completed').length === 0 && (
+                  {!jobs?.filter(j => j.status === 'Completed').length && (
                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No completed projects.</div>
                   )}
                   {jobs?.filter(j => j.status === 'Completed').map((job, i) => (
@@ -141,7 +140,10 @@ export default function Dashboard() {
 }
 
 function ApplicationRow({ application, index, db }: { application: any; index: number; db: any }) {
-  const jobRef = useMemoFirebase(() => doc(db, "jobs", application.jobId), [db, application.jobId]);
+  const jobRef = useMemoFirebase(() => {
+    if (!db || !application.jobId) return null;
+    return doc(db, "jobs", application.jobId);
+  }, [db, application.jobId]);
   const { data: job } = useDoc(jobRef);
 
   const statusColors: Record<string, string> = {
@@ -213,7 +215,7 @@ function JobRow({ job, index }: { job: any; index: number }) {
                   {job.deadline}
                 </span>
                 <span className="flex items-center gap-1 capitalize">
-                  <span className={`h-1.5 w-1.5 rounded-full bg-${statusColors[job.status]}-500 mr-2`} />
+                  <span className={`h-1.5 w-1.5 rounded-full bg-${statusColors[job.status] || 'gray'}-500 mr-2`} />
                   {job.status}
                 </span>
               </div>

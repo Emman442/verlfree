@@ -10,21 +10,6 @@ service cloud.firestore {
      * a decentralized job board. It prioritizes "Authorization Independence" by 
      * ensuring documents contain necessary UID fields (clientId, freelancerId) 
      * to perform security checks without excessive cross-document lookups.
-     * 
-     * Data Structure:
-     * - /userProfiles/{userId}: Private-by-default profiles where the document ID matches the Auth UID.
-     * - /jobs/{jobId}: Top-level job listings. Publicly readable, but only manageable by the posting client 
-     *   or the assigned freelancer for specific actions (deliverable submission).
-     * - /jobs/{jobId}/applications/{applicationId}: Sub-collection for job applications. Secured by 
-     *   verifying the applicant's UID and the denormalized job owner's UID (jobClientId).
-     * 
-     * Key Security Decisions:
-     * 1. Denormalization for Performance: Jobs and Applications store UIDs of involved parties 
-     *    directly to allow O(1) authorization checks.
-     * 2. Status-Based Access: Logic assumes UI state management, while rules enforce that only 
-     *    authorized UIDs can trigger status transitions (e.g., a client selecting a freelancer).
-     * 3. Public Readability: Job listings are public to allow a "Job Board" experience, 
-     *    while specific user data remains protected.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -52,12 +37,8 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     /**
-     * @description Rules for user profiles. Users own their documents (path-based).
+     * @description Rules for user profiles.
      * @path /userProfiles/{userId}
-     * @allow (get) Any signed-in user to view profile details.
-     * @allow (create, update) Only the user whose UID matches the document ID.
-     * @deny (write) If the UID does not match the path.
-     * @principle Path-based ownership and verified identity.
      */
     match /userProfiles/{userId} {
       allow get: if isSignedIn();
@@ -68,13 +49,8 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for job listings. Clients own jobs; assigned freelancers can submit deliverables.
+     * @description Rules for job listings.
      * @path /jobs/{jobId}
-     * @allow (get, list) All users to browse the job board.
-     * @allow (create) Signed-in users, enforcing their UID as the clientId.
-     * @allow (update) The Job Client (full edit) or the Assigned Freelancer (limited to deliverable submission).
-     * @deny (write) Any non-owner or unassigned user.
-     * @principle Ownership-based writes with shared access for active collaborators.
      */
     match /jobs/{jobId} {
       allow get, list: if true;
@@ -84,25 +60,16 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for job applications. Accessible by the applicant and the job's client.
+     * @description Rules for job applications.
      * @path /jobs/{jobId}/applications/{applicationId}
-     * @allow (get) The applicant or the job owner.
-     * @allow (create) Any freelancer applying (enforces freelancerId matches auth UID).
-     * @allow (update) The applicant (cancel/edit) or the Job Client (reject/select/shortlist).
-     * @allow (list) The Job Client to see all applicants for their job.
-     * @deny (write) Users not explicitly involved in the job or application.
-     * @principle Denormalized authorization using 'jobClientId' for fast lookup-free checks.
      */
     match /jobs/{jobId}/applications/{applicationId} {
       
-      // Helper to check if user is either the applicant or the job's client
       function isInvolvedInApplication() {
         return isExistingOwner("freelancerId") || isExistingOwner("jobClientId");
       }
 
       allow get: if isSignedIn() && isInvolvedInApplication();
-      
-      // Clients list applications for their jobs via path-based lookup
       allow list: if isSignedIn() && isJobClient(jobId);
 
       allow create: if isSignedIn() 
@@ -117,11 +84,16 @@ service cloud.firestore {
     }
 
     /**
-     * @description Collection Group rules for Applications to support Freelancer "Applied Jobs" dashboard.
-     * @principle QAP (Query-Agnostic Permissions) for cross-collection tracking.
+     * @description Collection Group rules for Applications.
+     * Crucial for the freelancer's "Applied Jobs" dashboard.
+     * Rules must be broad enough to allow the query but narrow enough to be secure.
      */
     match /{path=**}/applications/{applicationId} {
-      allow list: if isSignedIn(); // Queries must be filtered by freelancerId == auth.uid in client code
+      allow list: if isSignedIn() && (
+        resource == null || 
+        resource.data.freelancerId == request.auth.uid || 
+        resource.data.jobClientId == request.auth.uid
+      );
     }
   }
 }
