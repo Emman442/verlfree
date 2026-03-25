@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Shield, Bell, Menu, X, User } from "lucide-react";
+import { Shield, Bell, Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,12 +19,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useUser, useAuth, initiateAnonymousSignIn } from "@/firebase";
+import { signOut } from "firebase/auth";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [connected, setConnected] = useState(false);
   const [mounted, setMounted] = useState(false);
+  
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+
   const [notifications, setNotifications] = useState([
     { id: 1, title: "Job Verified", description: "Your submission for 'NFT Market' was approved.", time: "2m ago" },
     { id: 2, title: "New Job Posted", description: "A client posted a job matching your skills.", time: "1h ago" },
@@ -44,6 +49,14 @@ export default function Navbar() {
     { name: "For Clients", href: "/clients" },
     { name: "Leaderboard", href: "/leaderboard" },
   ];
+
+  const handleConnect = () => {
+    initiateAnonymousSignIn(auth);
+  };
+
+  const handleDisconnect = () => {
+    signOut(auth);
+  };
 
   if (!mounted) return null;
 
@@ -128,12 +141,12 @@ export default function Navbar() {
             </PopoverContent>
           </Popover>
 
-          {connected ? (
+          {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="p-0 h-auto rounded-full ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
                   <Avatar className="w-8 h-8 border border-border">
-                    <AvatarImage src="https://picsum.photos/seed/user/100/100" />
+                    <AvatarImage src={`https://picsum.photos/seed/${user.uid}/100/100`} />
                     <AvatarFallback>VF</AvatarFallback>
                   </Avatar>
                 </Button>
@@ -148,17 +161,18 @@ export default function Navbar() {
                   <Link href="/leaderboard">Leaderboard</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setConnected(false)} className="text-destructive cursor-pointer">
+                <DropdownMenuItem onClick={handleDisconnect} className="text-destructive cursor-pointer">
                   Disconnect Wallet
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
             <Button
-              onClick={() => setConnected(true)}
+              onClick={handleConnect}
+              disabled={isUserLoading}
               className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 shadow-lg shadow-primary/20"
             >
-              Connect Wallet
+              {isUserLoading ? "Connecting..." : "Connect Wallet"}
             </Button>
           )}
 
@@ -191,12 +205,16 @@ export default function Navbar() {
                   {link.name}
                 </Link>
               ))}
-              {!connected && (
-                <Button className="w-full mt-4 h-12 text-lg font-bold" onClick={() => {
-                  setConnected(true);
-                  setMobileMenuOpen(false);
-                }}>
-                  Connect Wallet
+              {!user && (
+                <Button 
+                  className="w-full mt-4 h-12 text-lg font-bold" 
+                  onClick={() => {
+                    handleConnect();
+                    setMobileMenuOpen(false);
+                  }}
+                  disabled={isUserLoading}
+                >
+                  {isUserLoading ? "Connecting..." : "Connect Wallet"}
                 </Button>
               )}
             </div>
