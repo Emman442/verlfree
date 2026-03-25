@@ -1,43 +1,99 @@
+
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Wallet, Briefcase, CheckCircle2, Clock, Plus, Users } from "lucide-react";
+import { 
+  Wallet, 
+  Briefcase, 
+  CheckCircle2, 
+  Clock, 
+  Plus, 
+  Users, 
+  UserCircle, 
+  Trophy, 
+  Rocket,
+  ShieldCheck,
+  TrendingUp,
+  ArrowRight
+} from "lucide-react";
 import Link from "next/link";
 import { 
   useFirestore, 
   useCollection, 
   useUser, 
   useMemoFirebase,
-  useDoc
+  useDoc,
+  setDocumentNonBlocking,
+  updateDocumentNonBlocking
 } from "@/firebase";
 import { collection, query, where, collectionGroup, doc } from "firebase/firestore";
+import { useState } from "react";
 
 export default function Dashboard() {
   const db = useFirestore();
   const { user } = useUser();
 
+  // Fetch User Profile to determine role
+  const profileRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "userProfiles", user.uid);
+  }, [db, user]);
+  const { data: profile, isLoading: profileLoading } = useDoc(profileRef);
+
+  // Client Queries
   const clientJobsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, "jobs"), where("clientId", "==", user.uid));
   }, [db, user]);
-  const { data: jobs, isLoading: jobsLoading } = useCollection(clientJobsQuery);
+  const { data: clientJobs, isLoading: clientJobsLoading } = useCollection(clientJobsQuery);
 
-  const appliedQuery = useMemoFirebase(() => {
+  // Freelancer Queries
+  const freelancerAppsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collectionGroup(db, "applications"), where("freelancerId", "==", user.uid));
   }, [db, user]);
-  const { data: applications, isLoading: appsLoading } = useCollection(appliedQuery);
+  const { data: applications, isLoading: appsLoading } = useCollection(freelancerAppsQuery);
 
-  const stats = [
-    { label: "Total Escrowed", value: "2,450", suffix: " GEN", icon: Wallet },
-    { label: "Active Jobs", value: jobs?.filter(j => j.status === 'Active').length || 0, suffix: "", icon: Briefcase },
-    { label: "Completed", value: jobs?.filter(j => j.status === 'Completed').length || 0, suffix: "", icon: CheckCircle2 },
-    { label: "Applications", value: applications?.length || 0, suffix: "", icon: Clock },
+  const freelancerActiveJobsQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(collection(db, "jobs"), where("assignedFreelancerId", "==", user.uid));
+  }, [db, user]);
+  const { data: freelancerJobs, isLoading: freelancerJobsLoading } = useCollection(freelancerActiveJobsQuery);
+
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground font-medium animate-pulse">Syncing on-chain profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Onboarding: No profile found
+  if (!profile) {
+    return <RoleSelection user={user} db={db} />;
+  }
+
+  const isClient = profile.role === "Client";
+
+  // Stats based on role
+  const stats = isClient ? [
+    { label: "Total Escrowed", value: profile.totalValueEscrowed || "0", suffix: " GEN", icon: Wallet },
+    { label: "Active Jobs", value: clientJobs?.filter(j => j.status === 'Active').length || 0, suffix: "", icon: Briefcase },
+    { label: "Pending Applicants", value: clientJobs?.reduce((acc, j) => acc + (j.applicantIds?.length || 0), 0) || 0, suffix: "", icon: Users },
+    { label: "Success Rate", value: "100", suffix: "%", icon: CheckCircle2 },
+  ] : [
+    { label: "Total Earned", value: profile.totalEarned || "0", suffix: " GEN", icon: TrendingUp },
+    { label: "Active Projects", value: freelancerJobs?.filter(j => j.status === 'Active').length || 0, suffix: "", icon: Rocket },
+    { label: "My Applications", value: applications?.length || 0, suffix: "", icon: Clock },
+    { label: "Reputation", value: profile.reputationScore || "0", suffix: "", icon: Trophy },
   ];
 
   return (
@@ -46,17 +102,28 @@ export default function Dashboard() {
       <div className="container mx-auto px-4 pt-32 pb-20">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
           <div>
-            <h1 className="text-3xl font-bold mb-2 tracking-tight">
-              Dashboard
-            </h1>
-            <p className="text-muted-foreground">Manage your projects, escrows, and applications.</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                {isClient ? "Client Mode" : "Freelancer Mode"}
+              </Badge>
+              <h1 className="text-3xl font-bold tracking-tight">
+                Welcome back, {profile.username}
+              </h1>
+            </div>
+            <p className="text-muted-foreground">
+              {isClient 
+                ? "Manage your listings and verify project milestones." 
+                : "Track your applications and active project status."}
+            </p>
           </div>
-          <Button asChild size="lg" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
-            <Link href="/post-job">
-              <Plus className="w-5 h-5 mr-2" />
-              Post New Job
-            </Link>
-          </Button>
+          {isClient && (
+            <Button asChild size="lg" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+              <Link href="/post-job">
+                <Plus className="w-5 h-5 mr-2" />
+                Post New Job
+              </Link>
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -85,48 +152,74 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <Tabs defaultValue="open" className="w-full">
+        <Tabs defaultValue={isClient ? "open" : "applied"} className="w-full">
           <TabsList className="mb-8 bg-muted/50 p-1 flex-wrap h-auto">
-            <TabsTrigger value="open" className="px-6 data-[state=active]:bg-background">My Listings</TabsTrigger>
-            <TabsTrigger value="active" className="px-6 data-[state=active]:bg-background">Active Projects</TabsTrigger>
-            <TabsTrigger value="applied" className="px-6 data-[state=active]:bg-background">Applied Jobs</TabsTrigger>
-            <TabsTrigger value="completed" className="px-6 data-[state=active]:bg-background">Completed</TabsTrigger>
+            {isClient ? (
+              <>
+                <TabsTrigger value="open" className="px-6">My Listings</TabsTrigger>
+                <TabsTrigger value="active" className="px-6">Active Projects</TabsTrigger>
+                <TabsTrigger value="completed" className="px-6">Completed</TabsTrigger>
+              </>
+            ) : (
+              <>
+                <TabsTrigger value="applied" className="px-6">Applied Jobs</TabsTrigger>
+                <TabsTrigger value="active" className="px-6">Active Projects</TabsTrigger>
+                <TabsTrigger value="completed" className="px-6">Completed</TabsTrigger>
+              </>
+            )}
           </TabsList>
           
           <div className="mt-4">
-            {jobsLoading || appsLoading ? (
-              <div className="p-12 text-center text-muted-foreground animate-pulse">Synchronizing dashboard...</div>
-            ) : (
+            {isClient ? (
               <>
                 <TabsContent value="open" className="space-y-4">
-                  {!jobs?.filter(j => j.status === 'Open').length && (
-                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No open listings.</div>
+                  {!clientJobs?.filter(j => j.status === 'Open').length && (
+                    <EmptyState message="No open listings." actionLink="/post-job" actionText="Post Job" />
                   )}
-                  {jobs?.filter(j => j.status === 'Open').map((job, i) => (
+                  {clientJobs?.filter(j => j.status === 'Open').map((job, i) => (
                     <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="active" className="space-y-4">
-                  {!jobs?.filter(j => j.status === 'Active').length && (
-                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No active projects.</div>
+                  {!clientJobs?.filter(j => j.status === 'Active').length && (
+                    <EmptyState message="No active projects." />
                   )}
-                  {jobs?.filter(j => j.status === 'Active').map((job, i) => (
+                  {clientJobs?.filter(j => j.status === 'Active').map((job, i) => (
                     <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
+                <TabsContent value="completed" className="space-y-4">
+                  {!clientJobs?.filter(j => j.status === 'Completed').length && (
+                    <EmptyState message="No completed projects." />
+                  )}
+                  {clientJobs?.filter(j => j.status === 'Completed').map((job, i) => (
+                    <JobRow key={job.id} job={job} index={i} />
+                  ))}
+                </TabsContent>
+              </>
+            ) : (
+              <>
                 <TabsContent value="applied" className="space-y-4">
                   {!applications?.length && (
-                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">You haven't applied to any jobs yet.</div>
+                    <EmptyState message="You haven't applied to any jobs yet." actionLink="/jobs" actionText="Browse Jobs" />
                   )}
                   {applications?.map((app, i) => (
                     <ApplicationRow key={app.id} application={app} index={i} db={db} />
                   ))}
                 </TabsContent>
-                <TabsContent value="completed" className="space-y-4">
-                  {!jobs?.filter(j => j.status === 'Completed').length && (
-                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No completed projects.</div>
+                <TabsContent value="active" className="space-y-4">
+                  {!freelancerJobs?.filter(j => j.status === 'Active').length && (
+                    <EmptyState message="No active projects assigned to you." />
                   )}
-                  {jobs?.filter(j => j.status === 'Completed').map((job, i) => (
+                  {freelancerJobs?.filter(j => j.status === 'Active').map((job, i) => (
+                    <JobRow key={job.id} job={job} index={i} />
+                  ))}
+                </TabsContent>
+                <TabsContent value="completed" className="space-y-4">
+                  {!freelancerJobs?.filter(j => j.status === 'Completed').length && (
+                    <EmptyState message="No completed projects." />
+                  )}
+                  {freelancerJobs?.filter(j => j.status === 'Completed').map((job, i) => (
                     <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
@@ -135,6 +228,103 @@ export default function Dashboard() {
           </div>
         </Tabs>
       </div>
+    </div>
+  );
+}
+
+function RoleSelection({ user, db }: { user: any; db: any }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleSelectRole = (role: "Client" | "Freelancer") => {
+    if (!db || !user) return;
+    setLoading(true);
+
+    const profileData = {
+      id: user.uid,
+      walletAddress: user.uid,
+      username: user.uid.substring(0, 6),
+      bio: `I am a ${role} on VeriFree.`,
+      role: role,
+      reputationScore: role === "Freelancer" ? 50 : 0,
+      totalJobsCompleted: 0,
+      totalValueEscrowed: 0,
+      totalEarned: 0,
+      successRate: 0,
+      portfolioJobIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setDocumentNonBlocking(doc(db, "userProfiles", user.uid), profileData, { merge: true });
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8"
+      >
+        <div className="md:col-span-2 text-center mb-4">
+          <h2 className="text-4xl font-extrabold mb-4">Choose your <span className="gradient-text">destiny.</span></h2>
+          <p className="text-muted-foreground">Pick how you want to interact with the VeriFree protocol.</p>
+        </div>
+
+        <RoleCard 
+          title="I want to Hire"
+          desc="Post jobs, set success criteria, and use AI to verify deliverables automatically."
+          icon={Users}
+          color="primary"
+          onClick={() => handleSelectRole("Client")}
+          loading={loading}
+        />
+
+        <RoleCard 
+          title="I want to Work"
+          desc="Apply for jobs, build your on-chain reputation, and get paid instantly upon verification."
+          icon={Briefcase}
+          color="accent"
+          onClick={() => handleSelectRole("Freelancer")}
+          loading={loading}
+        />
+      </motion.div>
+    </div>
+  );
+}
+
+function RoleCard({ title, desc, icon: Icon, color, onClick, loading }: any) {
+  return (
+    <Card className={`group hover:border-${color} transition-all cursor-pointer overflow-hidden relative`} onClick={onClick}>
+      <CardContent className="pt-12 pb-10 px-8 text-center">
+        <div className={`w-20 h-20 bg-${color}/10 rounded-3xl flex items-center justify-center mx-auto mb-8 group-hover:scale-110 transition-transform`}>
+          <Icon className={`w-10 h-10 text-${color}`} />
+        </div>
+        <h3 className="text-2xl font-bold mb-4">{title}</h3>
+        <p className="text-muted-foreground mb-8">{desc}</p>
+        <Button variant="outline" className={`group-hover:bg-${color} group-hover:text-white transition-colors`}>
+          Select Role
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </CardContent>
+      {loading && (
+        <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function EmptyState({ message, actionLink, actionText }: { message: string; actionLink?: string; actionText?: string }) {
+  return (
+    <div className="text-center py-20 text-muted-foreground border-2 border-dashed border-border rounded-2xl">
+      <Briefcase className="w-12 h-12 mx-auto mb-4 opacity-10" />
+      <p className="font-medium mb-6">{message}</p>
+      {actionLink && (
+        <Button asChild variant="outline" className="border-primary/50 text-primary hover:bg-primary/5">
+          <Link href={actionLink}>{actionText}</Link>
+        </Button>
+      )}
     </div>
   );
 }
@@ -160,12 +350,12 @@ function ApplicationRow({ application, index, db }: { application: any; index: n
       transition={{ delay: index * 0.05 }}
     >
       <Link href={`/jobs/${application.jobId}`}>
-        <Card className="hover:bg-accent/30 transition-all border-border/50 group">
+        <Card className="hover:bg-accent/5 transition-all border-border/50 group">
           <CardContent className="flex items-center justify-between p-6">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
                 <h3 className="text-lg font-bold group-hover:text-primary transition-colors">
-                  {job?.title || "Loading..."}
+                  {job?.title || "Syncing Contract..."}
                 </h3>
                 <Badge className={`${statusColors[application.status]} text-white border-none text-[10px]`}>
                   {application.status}
@@ -173,7 +363,15 @@ function ApplicationRow({ application, index, db }: { application: any; index: n
               </div>
               <p className="text-sm text-muted-foreground line-clamp-1 italic">"{application.coverNote}"</p>
             </div>
-            <Button size="sm" variant="ghost">View Job</Button>
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Applied On</p>
+                <p className="text-sm font-medium">{new Date(application.appliedAt).toLocaleDateString()}</p>
+              </div>
+              <Button size="sm" variant="ghost" className="group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                View Job
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </Link>
@@ -183,9 +381,9 @@ function ApplicationRow({ application, index, db }: { application: any; index: n
 
 function JobRow({ job, index }: { job: any; index: number }) {
   const statusColors: Record<string, string> = {
-    "Open": "blue",
-    "Active": "blue",
-    "Completed": "green",
+    "Open": "text-blue-500 bg-blue-500/10",
+    "Active": "text-green-500 bg-green-500/10",
+    "Completed": "text-primary bg-primary/10",
   };
 
   const applicantCount = job.applicantIds?.length || 0;
@@ -197,36 +395,35 @@ function JobRow({ job, index }: { job: any; index: number }) {
       transition={{ delay: index * 0.05 }}
     >
       <Link href={`/jobs/${job.id}`}>
-        <Card className="hover:bg-accent/50 transition-all border-border/50 group">
+        <Card className="hover:bg-accent/5 transition-all border-border/50 group overflow-hidden">
           <CardContent className="flex flex-col md:flex-row items-center justify-between p-6 gap-6">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-2">
                 <h3 className="text-lg font-bold group-hover:text-primary transition-colors">{job.title}</h3>
-                {job.status === "Open" && (
-                  <Badge variant="outline" className="text-[10px] bg-primary/5 border-primary/20 text-primary">
-                    <Users className="w-3 h-3 mr-1" />
-                    {applicantCount} applicants
-                  </Badge>
-                )}
+                <Badge variant="outline" className={`text-[10px] border-none ${statusColors[job.status]}`}>
+                  {job.status}
+                </Badge>
               </div>
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  {job.deadline}
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-primary" />
+                  Due {job.deadline}
                 </span>
-                <span className="flex items-center gap-1 capitalize">
-                  <span className={`h-1.5 w-1.5 rounded-full bg-${statusColors[job.status] || 'gray'}-500 mr-2`} />
-                  {job.status}
-                </span>
+                {job.status === "Open" && (
+                  <span className="flex items-center gap-1.5 font-bold text-primary">
+                    <Users className="w-4 h-4" />
+                    {applicantCount} applicants
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-8 w-full md:w-auto justify-between">
               <div className="text-right">
-                <p className="font-black text-lg">{job.budget} GEN</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Escrow</p>
+                <p className="font-black text-xl text-foreground">{job.budget} GEN</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">In Escrow</p>
               </div>
-              <Button size="sm" className="bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all min-w-[120px]">
-                {job.status === "Open" ? "View Applicants" : "Manage"}
+              <Button size="sm" className="bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all min-w-[140px]">
+                {job.status === "Open" ? "Manage Candidates" : "View Progress"}
               </Button>
             </div>
           </CardContent>
