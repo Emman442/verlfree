@@ -1,0 +1,320 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile on the VeriFree platform, containing information about their wallet, chosen role (Client or Freelancer), and relevant statistics.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity, typically derived from the user's blockchain wallet address."
+        },
+        "walletAddress": {
+          "type": "string",
+          "description": "The blockchain wallet address associated with this user profile, serving as a primary link for authentication and transactions."
+        },
+        "username": {
+          "type": "string",
+          "description": "A unique, user-chosen display name for public identification on the platform."
+        },
+        "bio": {
+          "type": "string",
+          "description": "A short biographical description provided by the user, outlining their skills or interests."
+        },
+        "role": {
+          "type": "string",
+          "description": "The primary role of the user on the platform, determining dashboard and feature access.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reputationScore": {
+          "type": "number",
+          "description": "A numerical score (e.g., out of 100) reflecting the user's reliability and performance on the platform, visible on leaderboards and profiles."
+        },
+        "totalJobsCompleted": {
+          "type": "number",
+          "description": "The cumulative count of jobs successfully completed by this user, either as a client or a freelancer."
+        },
+        "totalValueEscrowed": {
+          "type": "number",
+          "description": "The total monetary value (in GEN tokens) that this user, acting as a client, has placed into escrow across all their jobs."
+        },
+        "totalEarned": {
+          "type": "number",
+          "description": "The total monetary value (in GEN tokens) that this user, acting as a freelancer, has earned from completed jobs."
+        },
+        "successRate": {
+          "type": "number",
+          "description": "The percentage of jobs successfully completed as a freelancer, indicating their reliability."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was first created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user profile was last updated.",
+          "format": "date-time"
+        },
+        "portfolioJobIds": {
+          "type": "array",
+          "description": "References to Job entities that this freelancer has completed and chosen to display in their public portfolio. (Relationship: Job N:N UserProfile)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "walletAddress",
+        "username",
+        "bio",
+        "role",
+        "reputationScore",
+        "totalJobsCompleted",
+        "totalValueEscrowed",
+        "totalEarned",
+        "successRate",
+        "createdAt",
+        "updatedAt",
+        "portfolioJobIds"
+      ]
+    },
+    "Job": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Job",
+      "type": "object",
+      "description": "Represents a job listing posted by a client, including its detailed requirements, current status, and associated applications.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Job entity."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Reference to the UserProfile of the client who posted this job. (Relationship: UserProfile 1:N Job)"
+        },
+        "title": {
+          "type": "string",
+          "description": "The concise title of the job, displayed on job boards and dashboards."
+        },
+        "description": {
+          "type": "string",
+          "description": "A comprehensive description outlining the job's scope, requirements, and deliverables."
+        },
+        "category": {
+          "type": "string",
+          "description": "The category to which the job belongs (e.g., 'Web Development', 'Content Writing', 'Design'), used for filtering."
+        },
+        "budget": {
+          "type": "number",
+          "description": "The agreed-upon budget for the job, specified in GEN tokens."
+        },
+        "deadline": {
+          "type": "string",
+          "description": "The timestamp by which the job deliverable is expected to be submitted.",
+          "format": "date-time"
+        },
+        "successCriteria": {
+          "type": "string",
+          "description": "Plain English criteria that the submitted deliverable must meet for automatic AI verification and payment release."
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "A flag indicating whether the job is publicly visible on the job board or if a specific freelancer was invited."
+        },
+        "invitedFreelancerId": {
+          "type": "string",
+          "description": "Optional: Reference to the UserProfile of a specific freelancer who was invited to apply for this job. (Relationship: UserProfile 1:1 Job - if invited)"
+        },
+        "assignedFreelancerId": {
+          "type": "string",
+          "description": "Optional: Reference to the UserProfile of the freelancer currently assigned to and working on this job. This field is populated once a freelancer is selected. (Relationship: UserProfile 1:1 Job)"
+        },
+        "escrowAmount": {
+          "type": "number",
+          "description": "The amount of GEN tokens currently held in escrow for this job, typically matching the initial budget."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the job, dictating its visibility and next possible actions.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the job listing was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the job listing was last updated.",
+          "format": "date-time"
+        },
+        "deliverableUrl": {
+          "type": "string",
+          "description": "Optional: The URL pointing to the submitted work deliverable, once provided by the assigned freelancer.",
+          "format": "uri"
+        },
+        "aiVerificationVerdict": {
+          "type": "string",
+          "description": "Optional: The outcome of the AI verification process for the submitted deliverable (e.g., 'Passed', 'Failed', 'Pending')."
+        },
+        "aiVerificationReasoning": {
+          "type": "string",
+          "description": "Optional: Detailed reasoning provided by the AI for its verification verdict, explaining success or failure."
+        },
+        "milestoneIds": {
+          "type": "array",
+          "description": "References to Milestone entities if the job is structured with multiple payment milestones. (Relationship: Job 1:N Milestone)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applicantIds": {
+          "type": "array",
+          "description": "References to Application entities submitted for this job, used to track applicants. (Relationship: Job 1:N Application)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "clientId",
+        "title",
+        "description",
+        "category",
+        "budget",
+        "deadline",
+        "successCriteria",
+        "isPublic",
+        "escrowAmount",
+        "status",
+        "createdAt",
+        "updatedAt",
+        "milestoneIds",
+        "applicantIds"
+      ]
+    },
+    "Application": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Application",
+      "type": "object",
+      "description": "Represents a freelancer's application for a specific job, including their cover note and the application's current status.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Application entity."
+        },
+        "jobId": {
+          "type": "string",
+          "description": "Reference to the Job entity this application is submitted for. (Relationship: Job 1:N Application)"
+        },
+        "freelancerId": {
+          "type": "string",
+          "description": "Reference to the UserProfile of the freelancer who submitted this application. (Relationship: UserProfile 1:N Application)"
+        },
+        "coverNote": {
+          "type": "string",
+          "description": "A personalized message or cover letter submitted by the freelancer to the client with their application."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the application, reflecting its progress through the hiring process.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "appliedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the application was submitted.",
+          "format": "date-time"
+        },
+        "isAIRecommended": {
+          "type": "boolean",
+          "description": "A boolean flag indicating if this application has been highlighted by the AI as a top recommended candidate for the client's review. (Primarily for UI demo purposes)"
+        },
+        "aiRecommendationReason": {
+          "type": "string",
+          "description": "A short, one-line explanation provided by the AI for why it recommended this application, if applicable. (Primarily for UI demo purposes)"
+        }
+      },
+      "required": [
+        "id",
+        "jobId",
+        "freelancerId",
+        "coverNote",
+        "status",
+        "appliedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/userProfiles/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Collection for user profiles. The document ID `{userId}` matches the user's authentication UID, providing path-based private ownership. Public fields (e.g., username, reputation score) are readable by others, while all fields are read/write for the owning user (request.auth.uid).",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user, matching their authentication UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/jobs/{jobId}",
+        "definition": {
+          "entityName": "Job",
+          "schema": {
+            "$ref": "#/backend/entities/Job"
+          },
+          "description": "Main collection for all job listings. Each job document includes 'clientId' for ownership and 'assignedFreelancerId' for assignment, enabling authorization independence. The 'isPublic' field facilitates secure listing queries for the job board. Denormalized fields within the Job document ensure rules do not require 'get()' operations to parent documents for basic authorization.",
+          "params": [
+            {
+              "name": "jobId",
+              "description": "The unique ID of the job listing."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/jobs/{jobId}/applications/{applicationId}",
+        "definition": {
+          "entityName": "Application",
+          "schema": {
+            "$ref": "#/backend/entities/Application"
+          },
+          "description": "Subcollection storing applications for a specific job. Each application document includes 'freelancerId' (the applicant) and a denormalized 'jobClientId' (from the parent Job) for authorization independence. This allows both the freelancer and the client to access and manage the application without needing to fetch the parent Job document in security rules.",
+          "params": [
+            {
+              "name": "jobId",
+              "description": "The unique ID of the parent job."
+            },
+            {
+              "name": "applicationId",
+              "description": "The unique ID of the application."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure for VeriFree prioritizes Authorization Independence and QAPs (Query-Agnostic Permissions) through strategic denormalization and structural segregation. It adheres to the CORE DESIGN PRINCIPLES to ensure robust, debuggable security rules.\n\n1.  **UserProfiles:** The `/userProfiles/{userId}` collection is designed for private user data, where `{userId}` directly corresponds to `request.auth.uid`. This provides clear path-based ownership, making security rules simple: `allow read, write: if request.auth.uid == userId;` for the owner, and read access for public profile fields to others.\n\n2.  **Jobs:** The `/jobs/{jobId}` collection serves as the central repository for all job listings. This flat structure facilitates efficient global queries for the 'Job Board Page' by allowing `list` operations to filter on `resource.data.isPublic == true`, which is a common and secure QAP pattern. For authorization independence, each Job document explicitly contains `clientId` (the job owner) and `assignedFreelancerId`. This allows security rules to evaluate ownership (`request.auth.uid == resource.data.clientId`) or assignment (`request.auth.uid == resource.data.assignedFreelancerId`) directly from the document itself, without requiring costly and complex `get()` calls to other documents.\n\n3.  **Applications (Subcollection):** The `/jobs/{jobId}/applications/{applicationId}` subcollection is crucial for the application flow. To achieve Authorization Independence (CRITICAL MANDATE), each `Application` document **MUST denormalize** the `clientId` from its parent `Job` document into a field like `jobClientId`. This denormalization is vital because it allows security rules to check both the applicant's ownership (`request.auth.uid == resource.data.freelancerId`) and the job client's ownership (`request.auth.uid == resource.data.jobClientId`) directly on the `Application` document without needing to fetch the parent `Job` document (`get(/jobs/{jobId})`). This enables atomic operations (e.g., a client rejecting multiple applications in a batch) and makes rules simpler and more performant.\n\n    *   **QAPs for Applications:**\n        *   **Client's Applicants Page:** Clients can securely query `/jobs/{jobId}/applications` for `jobId`s they own, with rules verifying `request.auth.uid == resource.data.jobClientId` for each application. The nested path naturally scopes applications to their respective jobs.\n        *   **Freelancer's Applied Jobs:** Freelancers can use a Collection Group Query across all `applications` subcollections, filtering by `resource.data.freelancerId == request.auth.uid`. The denormalized `jobClientId` ensures that even in a collection group query, authorization checks remain independent and efficient.\n\n**Structural Segregation** is maintained as all documents within `/userProfiles`, `/jobs`, and `/jobs/{jobId}/applications` share a homogeneous security posture, making rules straightforward. For instance, all `Application` documents are governed by rules pertaining to the applicant and the job's client.\n\n**Data Clarity and Predictability** are enforced through explicit `status` fields for Jobs and Applications (e.g., 'Open', 'Active' for Jobs; 'Pending', 'Selected' for Applications) and the use of descriptive wildcards like `{userId}`, `{jobId}`, and `{applicationId}`. While the `Job` schema includes `applicantIds`, for optimal performance and consistency, particularly for real-time counts ('X applicants' badge), it is generally recommended to derive the count directly from the `applications` subcollection (e.g., using a `.count()` aggregation query) rather than maintaining a denormalized array in the parent `Job` document, which could lead to synchronization challenges."
+  }
+}
