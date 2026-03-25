@@ -1,4 +1,3 @@
-
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
@@ -7,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Wallet, Briefcase, CheckCircle2, Clock, Plus, User, Users } from "lucide-react";
+import { Wallet, Briefcase, CheckCircle2, Clock, Plus, Users, Search } from "lucide-react";
 import Link from "next/link";
 import { 
   useFirestore, 
@@ -15,7 +14,7 @@ import {
   useUser, 
   useMemoFirebase 
 } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
+import { collection, query, where, collectionGroup } from "firebase/firestore";
 
 export default function Dashboard() {
   const db = useFirestore();
@@ -28,11 +27,18 @@ export default function Dashboard() {
   }, [db, user]);
   const { data: jobs, isLoading: jobsLoading } = useCollection(clientJobsQuery);
 
+  // Fetch applications where user is the freelancer (using collection group)
+  const appliedQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(collectionGroup(db, "applications"), where("freelancerId", "==", user.uid));
+  }, [db, user]);
+  const { data: applications, isLoading: appsLoading } = useCollection(appliedQuery);
+
   const stats = [
     { label: "Total Escrowed", value: "2,450", suffix: " GEN", icon: Wallet },
     { label: "Active Jobs", value: jobs?.filter(j => j.status === 'Active').length || 0, suffix: "", icon: Briefcase },
     { label: "Completed", value: jobs?.filter(j => j.status === 'Completed').length || 0, suffix: "", icon: CheckCircle2 },
-    { label: "Pending Selection", value: jobs?.filter(j => j.status === 'Open').length || 0, suffix: "", icon: Clock },
+    { label: "Applications", value: applications?.length || 0, suffix: "", icon: Clock },
   ];
 
   return (
@@ -44,7 +50,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold mb-2 tracking-tight">
               Welcome back, {user?.displayName || 'Builder'}
             </h1>
-            <p className="text-muted-foreground">Manage your active escrows and hire top talent.</p>
+            <p className="text-muted-foreground">Manage your active escrows and track your applications.</p>
           </div>
           <Button asChild size="lg" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
             <Link href="/post-job">
@@ -81,50 +87,104 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Jobs List */}
+        {/* Unified Dashboard Tabs */}
         <Tabs defaultValue="open" className="w-full">
-          <TabsList className="mb-8 bg-muted/50 p-1">
-            <TabsTrigger value="open" className="px-8 data-[state=active]:bg-background">Open Listings</TabsTrigger>
-            <TabsTrigger value="active" className="px-8 data-[state=active]:bg-background">In Progress</TabsTrigger>
-            <TabsTrigger value="completed" className="px-8 data-[state=active]:bg-background">Completed</TabsTrigger>
+          <TabsList className="mb-8 bg-muted/50 p-1 flex-wrap h-auto">
+            <TabsTrigger value="open" className="px-6 data-[state=active]:bg-background">My Listings</TabsTrigger>
+            <TabsTrigger value="active" className="px-6 data-[state=active]:bg-background">Active Projects</TabsTrigger>
+            <TabsTrigger value="completed" className="px-6 data-[state=active]:bg-background">Completed</TabsTrigger>
+            <TabsTrigger value="applied" className="px-6 data-[state=active]:bg-background">Applied Jobs</TabsTrigger>
           </TabsList>
           
-          {jobsLoading ? (
-            <div className="p-12 text-center text-muted-foreground animate-pulse">Synchronizing on-chain data...</div>
-          ) : (
-            <>
-              <TabsContent value="open" className="space-y-4">
-                {jobs?.filter(j => j.status === 'Open').length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No open listings.</div>
-                )}
-                {jobs?.filter(j => j.status === 'Open').map((job, i) => (
-                  <JobRow key={job.id} job={job} index={i} />
-                ))}
-              </TabsContent>
-              <TabsContent value="active" className="space-y-4">
-                {jobs?.filter(j => j.status === 'Active').length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No active projects.</div>
-                )}
-                {jobs?.filter(j => j.status === 'Active').map((job, i) => (
-                  <JobRow key={job.id} job={job} index={i} />
-                ))}
-              </TabsContent>
-              <TabsContent value="completed" className="space-y-4">
-                {jobs?.filter(j => j.status === 'Completed').map((job, i) => (
-                  <JobRow key={job.id} job={job} index={i} />
-                ))}
-              </TabsContent>
-            </>
-          )}
+          <div className="mt-4">
+            {jobsLoading || appsLoading ? (
+              <div className="p-12 text-center text-muted-foreground animate-pulse">Synchronizing on-chain data...</div>
+            ) : (
+              <>
+                <TabsContent value="open" className="space-y-4">
+                  {jobs?.filter(j => j.status === 'Open').length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No open listings.</div>
+                  )}
+                  {jobs?.filter(j => j.status === 'Open').map((job, i) => (
+                    <JobRow key={job.id} job={job} index={i} type="client" />
+                  ))}
+                </TabsContent>
+                <TabsContent value="active" className="space-y-4">
+                  {jobs?.filter(j => j.status === 'Active').length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No active projects.</div>
+                  )}
+                  {jobs?.filter(j => j.status === 'Active').map((job, i) => (
+                    <JobRow key={job.id} job={job} index={i} type="client" />
+                  ))}
+                </TabsContent>
+                <TabsContent value="completed" className="space-y-4">
+                  {jobs?.filter(j => j.status === 'Completed').map((job, i) => (
+                    <JobRow key={job.id} job={job} index={i} type="client" />
+                  ))}
+                </TabsContent>
+                <TabsContent value="applied" className="space-y-4">
+                  {applications?.length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">You haven't applied to any jobs yet.</div>
+                  )}
+                  {applications?.map((app, i) => (
+                    <ApplicationRow key={app.id} application={app} index={i} db={db} />
+                  ))}
+                </TabsContent>
+              </>
+            )}
+          </div>
         </Tabs>
       </div>
     </div>
   );
 }
 
-function JobRow({ job, index }: { job: any; index: number }) {
+function ApplicationRow({ application, index, db }: { application: any; index: number; db: any }) {
+  // We need to fetch the job title for the application row
+  const jobRef = useMemoFirebase(() => doc(db, "jobs", application.jobId), [db, application.jobId]);
+  const { data: job } = useDoc(jobRef);
+
   const statusColors: Record<string, string> = {
-    "Open": "yellow",
+    "Pending": "bg-yellow-500",
+    "Shortlisted": "bg-accent",
+    "Selected": "bg-green-500",
+    "Rejected": "bg-destructive",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.05 }}
+    >
+      <Link href={`/jobs/${application.jobId}`}>
+        <Card className="hover:bg-accent/30 transition-all border-border/50 group">
+          <CardContent className="flex items-center justify-between p-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-1">
+                <h3 className="text-lg font-bold group-hover:text-primary transition-colors">
+                  {job?.title || "Loading Job..."}
+                </h3>
+                <Badge className={`${statusColors[application.status]} text-white border-none`}>
+                  {application.status}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground line-clamp-1 italic">"{application.coverNote}"</p>
+            </div>
+            <Button size="sm" variant="ghost">View Job</Button>
+          </CardContent>
+        </Card>
+      </Link>
+    </motion.div>
+  );
+}
+
+import { doc } from "firebase/firestore";
+import { useDoc as useDocCustom } from "@/firebase";
+
+function JobRow({ job, index, type }: { job: any; index: number; type: 'client' | 'freelancer' }) {
+  const statusColors: Record<string, string> = {
+    "Open": "blue",
     "Active": "blue",
     "Completed": "green",
   };

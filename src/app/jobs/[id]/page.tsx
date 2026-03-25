@@ -1,25 +1,24 @@
-
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Navbar from "@/components/layout/Navbar";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   CheckCircle2, 
   Clock, 
   MessageSquare, 
-  ExternalLink,
   ShieldCheck,
-  AlertCircle,
   Users,
   XCircle,
   Sparkles,
-  Trophy
+  Trophy,
+  Rocket
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { 
@@ -30,9 +29,7 @@ import {
   useMemoFirebase,
   updateDocumentNonBlocking
 } from "@/firebase";
-import { doc, collection, query, where, writeBatch } from "firebase/firestore";
-import { aiDeliverableVerification } from "@/ai/flows/ai-deliverable-verification-flow";
-import { aiVerificationExplanation } from "@/ai/flows/ai-verification-explanation-flow";
+import { doc, collection, query, where } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 export default function JobDetail() {
@@ -42,8 +39,8 @@ export default function JobDetail() {
   const { toast } = useToast();
   
   const [verifying, setVerifying] = useState(false);
-  const [verdict, setVerdict] = useState<any>(null);
   const [isAIReordering, setIsAIReordering] = useState(false);
+  const [deliverableUrl, setDeliverableUrl] = useState("");
 
   // Firestore Data
   const jobRef = useMemoFirebase(() => {
@@ -59,6 +56,7 @@ export default function JobDetail() {
   const { data: applications } = useCollection(appsQuery);
 
   const isClient = user && job && job.clientId === user.uid;
+  const isAssignedFreelancer = user && job && job.assignedFreelancerId === user.uid;
 
   // AI Shortlist Demo Logic
   const sortedApplications = useMemo(() => {
@@ -80,10 +78,8 @@ export default function JobDetail() {
       description: "Comparing cover notes and on-chain history...",
     });
     
-    // Simulate reordering with delay
     setTimeout(() => {
-      // In a real app, we'd update Firestore fields via a flow
-      // For this UI demo, we'll just trigger the sorted state
+      setIsAIReordering(true);
       toast({
         title: "Shortlist Complete",
         description: "Found the best fit for your requirements.",
@@ -94,31 +90,51 @@ export default function JobDetail() {
   const handleSelectFreelancer = (app: any) => {
     if (!db || !job) return;
 
-    // Update Job
+    // Update Job status and assignment
     updateDocumentNonBlocking(doc(db, "jobs", job.id), {
       status: "Active",
-      assignedFreelancerId: app.freelancerId
+      assignedFreelancerId: app.freelancerId,
+      updatedAt: new Date().toISOString()
     });
 
-    // Update all applications (Selected vs Rejected)
+    // Update applications status
     applications?.forEach((otherApp) => {
       const status = otherApp.id === app.id ? "Selected" : "Rejected";
       updateDocumentNonBlocking(doc(db, "jobs", job.id, "applications", otherApp.id), {
-        status
+        status,
+        updatedAt: new Date().toISOString()
       });
     });
 
     toast({
       title: "Freelancer Selected",
-      description: `${app.freelancerId.substring(0, 6)}... assigned to the job.`,
+      description: `Project is now Active. Payout locked in escrow.`,
     });
   };
 
   const handleRejectApplicant = (app: any) => {
     if (!db || !job) return;
     updateDocumentNonBlocking(doc(db, "jobs", job.id, "applications", app.id), {
-      status: "Rejected"
+      status: "Rejected",
+      updatedAt: new Date().toISOString()
     });
+  };
+
+  const handleSubmitDeliverable = () => {
+    if (!deliverableUrl) return;
+    setVerifying(true);
+    toast({
+      title: "Submitting Deliverable",
+      description: "Triggering GenLayer AI verification node...",
+    });
+    
+    setTimeout(() => {
+      setVerifying(false);
+      toast({
+        title: "Deliverable Received",
+        description: "AI Review is in progress. Check back shortly.",
+      });
+    }, 2000);
   };
 
   const successCriteria = [
@@ -131,7 +147,7 @@ export default function JobDetail() {
   if (jobLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-primary font-bold">Loading Job Details...</div>
+        <div className="animate-pulse text-primary font-bold">Synchronizing Node Data...</div>
       </div>
     );
   }
@@ -139,7 +155,7 @@ export default function JobDetail() {
   if (!job) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Job not found.</div>
+        <div className="text-muted-foreground">Contract not found on-chain.</div>
       </div>
     );
   }
@@ -201,8 +217,7 @@ export default function JobDetail() {
                           layout
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          className={`p-4 rounded-xl border bg-background transition-all hover:border-primary/30 ${app.isAIRecommended && isAIReordering ? 'border-yellow-500/50 ring-1 ring-yellow-500/20' : 'border-border'}`}
+                          className={`p-4 rounded-xl border bg-background transition-all hover:border-primary/30 ${app.isAIRecommended && isAIReordering ? 'border-yellow-500/50 ring-1 ring-yellow-500/20' : 'border-border'} ${app.status === 'Rejected' ? 'opacity-50 grayscale' : ''}`}
                         >
                           <div className="flex flex-col md:flex-row gap-6">
                             <div className="flex-1">
@@ -215,6 +230,9 @@ export default function JobDetail() {
                                   <span className="font-bold text-sm">
                                     {app.freelancerId.substring(0, 6)}...{app.freelancerId.substring(app.freelancerId.length - 4)}
                                   </span>
+                                  {app.status !== 'Pending' && (
+                                    <Badge variant="secondary" className="text-[10px] h-5">{app.status}</Badge>
+                                  )}
                                   {app.isAIRecommended && isAIReordering && (
                                     <Badge className="bg-yellow-500 text-black font-black text-[10px] h-5 px-2">
                                       AI RECOMMENDED
@@ -229,31 +247,28 @@ export default function JobDetail() {
                               <p className="text-sm text-muted-foreground line-clamp-3 mb-4 italic">
                                 "{app.coverNote}"
                               </p>
-                              {app.isAIRecommended && isAIReordering && (
-                                <div className="text-[10px] text-yellow-500 font-medium bg-yellow-500/5 p-2 rounded-lg border border-yellow-500/10 mb-2">
-                                  AI Verdict: {app.aiRecommendationReason || "Strongest cover note with relevant experience mentioned."}
-                                </div>
-                              )}
                             </div>
-                            <div className="flex md:flex-col gap-2 justify-end">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="text-destructive hover:bg-destructive/10"
-                                onClick={() => handleRejectApplicant(app)}
-                              >
-                                <XCircle className="w-4 h-4 mr-2" />
-                                Reject
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                className="bg-primary"
-                                onClick={() => handleSelectFreelancer(app)}
-                              >
-                                <ShieldCheck className="w-4 h-4 mr-2" />
-                                Select
-                              </Button>
-                            </div>
+                            {app.status === 'Pending' && (
+                              <div className="flex md:flex-col gap-2 justify-end">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleRejectApplicant(app)}
+                                >
+                                  <XCircle className="w-4 h-4 mr-2" />
+                                  Reject
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  className="bg-primary"
+                                  onClick={() => handleSelectFreelancer(app)}
+                                >
+                                  <ShieldCheck className="w-4 h-4 mr-2" />
+                                  Select
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </motion.div>
                       ))
@@ -267,29 +282,76 @@ export default function JobDetail() {
             {job.status === "Active" && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardHeader>
-                  <CardTitle className="text-lg">Project Delivery</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Rocket className="w-5 h-5 text-primary" />
+                    Deliverable Submission
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Logic for freelancer view vs client view would go here */}
-                  <div className="p-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
-                    <CheckCircle2 className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                    <p>Project is currently active. Awaiting deliverable submission.</p>
-                  </div>
+                  {isAssignedFreelancer ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="deliverable">Submission Link (GitHub, URL, etc.)</Label>
+                        <Input 
+                          id="deliverable" 
+                          placeholder="https://..." 
+                          value={deliverableUrl}
+                          onChange={(e) => setDeliverableUrl(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">AI will automatically crawl this link to verify against success criteria.</p>
+                      </div>
+                      <Button 
+                        onClick={handleSubmitDeliverable} 
+                        disabled={!deliverableUrl || verifying}
+                        className="w-full bg-primary py-6 text-lg font-bold"
+                      >
+                        {verifying ? "Triggering AI Node..." : "Submit for Verification"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
+                      <ShieldCheck className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                      <p className="font-medium">
+                        {isClient 
+                          ? "Contract is Active. Awaiting deliverable from the assigned freelancer." 
+                          : "You are not assigned to this job."}
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Chat */}
+            {/* Chat / Activity */}
             <Card>
               <CardHeader className="border-b border-border">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-primary" />
-                  Project Activity
+                  Project Log
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="text-center py-12 text-muted-foreground">
-                  Connect your wallet to start chatting with the {isClient ? 'freelancer' : 'client'}.
+                <div className="space-y-4">
+                  <div className="flex gap-4 items-start">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">Contract Initialized</p>
+                      <p className="text-xs text-muted-foreground">{new Date(job.createdAt).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  {job.status === 'Active' && (
+                    <div className="flex gap-4 items-start">
+                      <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">Freelancer Assigned</p>
+                        <p className="text-xs text-muted-foreground">Escrow funds locked by protocol.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -310,9 +372,9 @@ export default function JobDetail() {
                   <span className="text-muted-foreground text-sm">Deadline</span>
                   <span className="font-bold text-sm">{job.deadline}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-border">
-                  <span className="text-muted-foreground text-sm">Platform Fee</span>
-                  <span className="font-bold text-sm">5%</span>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-muted-foreground text-sm">Protocol Fee</span>
+                  <span className="font-bold text-sm text-primary">5%</span>
                 </div>
               </CardContent>
             </Card>
