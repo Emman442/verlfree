@@ -42,36 +42,30 @@ export default function JobDetail() {
   const [isAIReordering, setIsAIReordering] = useState(false);
   const [deliverableUrl, setDeliverableUrl] = useState("");
 
-  // Firestore Data: Fetch the job document first
   const jobRef = useMemoFirebase(() => {
     if (!db || !id) return null;
     return doc(db, "jobs", id as string);
   }, [db, id]);
   const { data: job, isLoading: jobLoading } = useDoc(jobRef);
 
-  // Authorization checks
   const isClient = user && job && job.clientId === user.uid;
   const isAssignedFreelancer = user && job && job.assignedFreelancerId === user.uid;
 
-  // Gate the applications query: Only clients should attempt to list applications
-  // to avoid "Missing or insufficient permissions" for other users.
   const appsQuery = useMemoFirebase(() => {
     if (!db || !id || !user || !job || job.clientId !== user.uid) return null;
     return collection(db, "jobs", id as string, "applications");
   }, [db, id, user, job]);
   const { data: applications } = useCollection(appsQuery);
 
-  // AI Shortlist Demo Logic
   const sortedApplications = useMemo(() => {
     if (!applications) return [];
     if (!isAIReordering) return applications;
     
-    const sorted = [...applications].sort((a, b) => {
+    return [...applications].sort((a, b) => {
       if (a.isAIRecommended) return -1;
       if (b.isAIRecommended) return 1;
       return 0;
     });
-    return sorted;
   }, [applications, isAIReordering]);
 
   const handleAIShortlist = () => {
@@ -93,14 +87,12 @@ export default function JobDetail() {
   const handleSelectFreelancer = (app: any) => {
     if (!db || !job) return;
 
-    // Update Job status and assignment
     updateDocumentNonBlocking(doc(db, "jobs", job.id), {
       status: "Active",
       assignedFreelancerId: app.freelancerId,
       updatedAt: new Date().toISOString()
     });
 
-    // Update applications status
     applications?.forEach((otherApp) => {
       const status = otherApp.id === app.id ? "Selected" : "Rejected";
       updateDocumentNonBlocking(doc(db, "jobs", job.id, "applications", otherApp.id), {
@@ -168,7 +160,6 @@ export default function JobDetail() {
       <Navbar />
       <div className="container mx-auto px-4 pt-32 pb-20">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Info */}
           <div className="lg:col-span-2 space-y-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -190,7 +181,6 @@ export default function JobDetail() {
               </p>
             </motion.div>
 
-            {/* Applications Section for Client */}
             {isClient && job.status === "Open" && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -214,7 +204,7 @@ export default function JobDetail() {
                     {sortedApplications.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">No applications yet.</div>
                     ) : (
-                      sortedApplications.map((app, idx) => (
+                      sortedApplications.map((app) => (
                         <motion.div
                           key={app.id}
                           layout
@@ -233,9 +223,6 @@ export default function JobDetail() {
                                   <span className="font-bold text-sm">
                                     {app.freelancerId.substring(0, 6)}...{app.freelancerId.substring(app.freelancerId.length - 4)}
                                   </span>
-                                  {app.status !== 'Pending' && (
-                                    <Badge variant="secondary" className="text-[10px] h-5">{app.status}</Badge>
-                                  )}
                                   {app.isAIRecommended && isAIReordering && (
                                     <Badge className="bg-yellow-500 text-black font-black text-[10px] h-5 px-2">
                                       AI RECOMMENDED
@@ -247,9 +234,15 @@ export default function JobDetail() {
                                   Rep: 95
                                 </div>
                               </div>
-                              <p className="text-sm text-muted-foreground line-clamp-3 mb-4 italic">
+                              <p className="text-sm text-muted-foreground line-clamp-3 mb-2 italic">
                                 "{app.coverNote}"
                               </p>
+                              {app.isAIRecommended && isAIReordering && (
+                                <p className="text-[10px] text-yellow-600 font-bold flex items-center gap-1">
+                                  <Sparkles className="w-3 h-3" />
+                                  Strongest cover note with relevant experience mentioned.
+                                </p>
+                              )}
                             </div>
                             {app.status === 'Pending' && (
                               <div className="flex md:flex-col gap-2 justify-end">
@@ -281,7 +274,6 @@ export default function JobDetail() {
               </Card>
             )}
 
-            {/* Submission / Verification Section for Active Jobs */}
             {job.status === "Active" && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardHeader>
@@ -325,7 +317,6 @@ export default function JobDetail() {
               </Card>
             )}
 
-            {/* Chat / Activity */}
             <Card>
               <CardHeader className="border-b border-border">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -360,7 +351,6 @@ export default function JobDetail() {
             </Card>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <Card>
               <CardHeader>

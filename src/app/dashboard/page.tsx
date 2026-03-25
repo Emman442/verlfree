@@ -6,28 +6,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Wallet, Briefcase, CheckCircle2, Clock, Plus, Users, Search } from "lucide-react";
+import { Wallet, Briefcase, CheckCircle2, Clock, Plus, Users } from "lucide-react";
 import Link from "next/link";
 import { 
   useFirestore, 
   useCollection, 
   useUser, 
-  useMemoFirebase 
+  useMemoFirebase,
+  useDoc
 } from "@/firebase";
-import { collection, query, where, collectionGroup } from "firebase/firestore";
+import { collection, query, where, collectionGroup, doc } from "firebase/firestore";
 
 export default function Dashboard() {
   const db = useFirestore();
   const { user } = useUser();
 
-  // Fetch jobs where user is the client
   const clientJobsQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, "jobs"), where("clientId", "==", user.uid));
   }, [db, user]);
   const { data: jobs, isLoading: jobsLoading } = useCollection(clientJobsQuery);
 
-  // Fetch applications where user is the freelancer (using collection group)
   const appliedQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collectionGroup(db, "applications"), where("freelancerId", "==", user.uid));
@@ -60,7 +59,6 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {stats.map((stat, i) => (
             <motion.div
@@ -87,7 +85,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Unified Dashboard Tabs */}
         <Tabs defaultValue="open" className="w-full">
           <TabsList className="mb-8 bg-muted/50 p-1 flex-wrap h-auto">
             <TabsTrigger value="open" className="px-6 data-[state=active]:bg-background">My Listings</TabsTrigger>
@@ -98,7 +95,7 @@ export default function Dashboard() {
           
           <div className="mt-4">
             {jobsLoading || appsLoading ? (
-              <div className="p-12 text-center text-muted-foreground animate-pulse">Synchronizing on-chain data...</div>
+              <div className="p-12 text-center text-muted-foreground animate-pulse">Synchronizing data...</div>
             ) : (
               <>
                 <TabsContent value="open" className="space-y-4">
@@ -106,7 +103,7 @@ export default function Dashboard() {
                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No open listings.</div>
                   )}
                   {jobs?.filter(j => j.status === 'Open').map((job, i) => (
-                    <JobRow key={job.id} job={job} index={i} type="client" />
+                    <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="active" className="space-y-4">
@@ -114,12 +111,12 @@ export default function Dashboard() {
                     <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl">No active projects.</div>
                   )}
                   {jobs?.filter(j => j.status === 'Active').map((job, i) => (
-                    <JobRow key={job.id} job={job} index={i} type="client" />
+                    <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="completed" className="space-y-4">
                   {jobs?.filter(j => j.status === 'Completed').map((job, i) => (
-                    <JobRow key={job.id} job={job} index={i} type="client" />
+                    <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="applied" className="space-y-4">
@@ -140,7 +137,6 @@ export default function Dashboard() {
 }
 
 function ApplicationRow({ application, index, db }: { application: any; index: number; db: any }) {
-  // We need to fetch the job title for the application row
   const jobRef = useMemoFirebase(() => doc(db, "jobs", application.jobId), [db, application.jobId]);
   const { data: job } = useDoc(jobRef);
 
@@ -163,9 +159,9 @@ function ApplicationRow({ application, index, db }: { application: any; index: n
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
                 <h3 className="text-lg font-bold group-hover:text-primary transition-colors">
-                  {job?.title || "Loading Job..."}
+                  {job?.title || "Loading..."}
                 </h3>
-                <Badge className={`${statusColors[application.status]} text-white border-none`}>
+                <Badge className={`${statusColors[application.status]} text-white border-none text-[10px]`}>
                   {application.status}
                 </Badge>
               </div>
@@ -179,10 +175,7 @@ function ApplicationRow({ application, index, db }: { application: any; index: n
   );
 }
 
-import { doc } from "firebase/firestore";
-import { useDoc as useDocCustom } from "@/firebase";
-
-function JobRow({ job, index, type }: { job: any; index: number; type: 'client' | 'freelancer' }) {
+function JobRow({ job, index }: { job: any; index: number }) {
   const statusColors: Record<string, string> = {
     "Open": "blue",
     "Active": "blue",
@@ -226,7 +219,7 @@ function JobRow({ job, index, type }: { job: any; index: number; type: 'client' 
                 <p className="font-black text-lg">{job.budget} GEN</p>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Escrow</p>
               </div>
-              <Button size="sm" className="bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all">
+              <Button size="sm" className="bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all min-w-[120px]">
                 {job.status === "Open" ? "View Applicants" : "Manage"}
               </Button>
             </div>
