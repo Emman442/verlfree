@@ -2,9 +2,9 @@
 "use client";
 
 import Navbar from "@/components/layout/Navbar";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -14,56 +14,43 @@ import {
   Clock, 
   Plus, 
   Users, 
-  UserCircle, 
   Trophy, 
   Rocket,
-  ShieldCheck,
   TrendingUp,
   ArrowRight
 } from "lucide-react";
 import Link from "next/link";
 import { 
   useFirestore, 
-  useCollection, 
   useUser, 
   useMemoFirebase,
   useDoc,
   setDocumentNonBlocking,
-  updateDocumentNonBlocking
 } from "@/firebase";
-import { collection, query, where, collectionGroup, doc } from "firebase/firestore";
+import { doc } from "firebase/firestore";
 import { useState } from "react";
+
+// Mock Data for Demo Stability
+const MOCK_APPLICATIONS = [
+  { id: "app-1", jobId: "demo-job-1", status: "Shortlisted", coverNote: "Expert in Next.js and Tailwind. I built the VeriFree prototype.", appliedAt: "2024-03-20T10:00:00Z" },
+  { id: "app-2", jobId: "demo-job-2", status: "Pending", coverNote: "I've written for several major Web3 protocols.", appliedAt: "2024-03-21T14:30:00Z" },
+];
+
+const MOCK_JOBS = [
+  { id: "demo-job-1", title: "Build a Next.js 15 SaaS Dashboard", status: "Open", budget: 1500, deadline: "2024-06-15", applicantIds: ["u1", "u2", "u3"] },
+  { id: "demo-job-4", title: "Mobile UI Design", status: "Active", budget: 2000, deadline: "2024-07-01", applicantIds: ["u5"] },
+];
 
 export default function Dashboard() {
   const db = useFirestore();
   const { user } = useUser();
 
-  // Fetch User Profile to determine role
+  // Fetch User Profile to determine role (persistent)
   const profileRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, "userProfiles", user.uid);
   }, [db, user]);
   const { data: profile, isLoading: profileLoading } = useDoc(profileRef);
-
-  // Client Queries
-  const clientJobsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "jobs"), where("clientId", "==", user.uid));
-  }, [db, user]);
-  const { data: clientJobs, isLoading: clientJobsLoading } = useCollection(clientJobsQuery);
-
-  // Freelancer Queries
-  const freelancerAppsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collectionGroup(db, "applications"), where("freelancerId", "==", user.uid));
-  }, [db, user]);
-  const { data: applications, isLoading: appsLoading } = useCollection(freelancerAppsQuery);
-
-  const freelancerActiveJobsQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(collection(db, "jobs"), where("assignedFreelancerId", "==", user.uid));
-  }, [db, user]);
-  const { data: freelancerJobs, isLoading: freelancerJobsLoading } = useCollection(freelancerActiveJobsQuery);
 
   if (profileLoading) {
     return (
@@ -85,15 +72,15 @@ export default function Dashboard() {
 
   // Stats based on role
   const stats = isClient ? [
-    { label: "Total Escrowed", value: profile.totalValueEscrowed || "0", suffix: " GEN", icon: Wallet },
-    { label: "Active Jobs", value: clientJobs?.filter(j => j.status === 'Active').length || 0, suffix: "", icon: Briefcase },
-    { label: "Pending Applicants", value: clientJobs?.reduce((acc, j) => acc + (j.applicantIds?.length || 0), 0) || 0, suffix: "", icon: Users },
+    { label: "Total Escrowed", value: profile.totalValueEscrowed || "4.5k", suffix: " GEN", icon: Wallet },
+    { label: "Active Jobs", value: 2, suffix: "", icon: Briefcase },
+    { label: "Pending Applicants", value: 8, suffix: "", icon: Users },
     { label: "Success Rate", value: "100", suffix: "%", icon: CheckCircle2 },
   ] : [
-    { label: "Total Earned", value: profile.totalEarned || "0", suffix: " GEN", icon: TrendingUp },
-    { label: "Active Projects", value: freelancerJobs?.filter(j => j.status === 'Active').length || 0, suffix: "", icon: Rocket },
-    { label: "My Applications", value: applications?.length || 0, suffix: "", icon: Clock },
-    { label: "Reputation", value: profile.reputationScore || "0", suffix: "", icon: Trophy },
+    { label: "Total Earned", value: profile.totalEarned || "12.8k", suffix: " GEN", icon: TrendingUp },
+    { label: "Active Projects", value: 1, suffix: "", icon: Rocket },
+    { label: "My Applications", value: MOCK_APPLICATIONS.length, suffix: "", icon: Clock },
+    { label: "Reputation", value: profile.reputationScore || "98", suffix: "", icon: Trophy },
   ];
 
   return (
@@ -173,55 +160,33 @@ export default function Dashboard() {
             {isClient ? (
               <>
                 <TabsContent value="open" className="space-y-4">
-                  {!clientJobs?.filter(j => j.status === 'Open').length && (
-                    <EmptyState message="No open listings." actionLink="/post-job" actionText="Post Job" />
-                  )}
-                  {clientJobs?.filter(j => j.status === 'Open').map((job, i) => (
+                  {MOCK_JOBS.filter(j => j.status === 'Open').map((job, i) => (
                     <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="active" className="space-y-4">
-                  {!clientJobs?.filter(j => j.status === 'Active').length && (
-                    <EmptyState message="No active projects." />
-                  )}
-                  {clientJobs?.filter(j => j.status === 'Active').map((job, i) => (
+                  {MOCK_JOBS.filter(j => j.status === 'Active').map((job, i) => (
                     <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="completed" className="space-y-4">
-                  {!clientJobs?.filter(j => j.status === 'Completed').length && (
-                    <EmptyState message="No completed projects." />
-                  )}
-                  {clientJobs?.filter(j => j.status === 'Completed').map((job, i) => (
-                    <JobRow key={job.id} job={job} index={i} />
-                  ))}
+                  <EmptyState message="No completed projects yet." />
                 </TabsContent>
               </>
             ) : (
               <>
                 <TabsContent value="applied" className="space-y-4">
-                  {!applications?.length && (
-                    <EmptyState message="You haven't applied to any jobs yet." actionLink="/jobs" actionText="Browse Jobs" />
-                  )}
-                  {applications?.map((app, i) => (
-                    <ApplicationRow key={app.id} application={app} index={i} db={db} />
+                  {MOCK_APPLICATIONS.map((app, i) => (
+                    <ApplicationRow key={app.id} application={app} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="active" className="space-y-4">
-                  {!freelancerJobs?.filter(j => j.status === 'Active').length && (
-                    <EmptyState message="No active projects assigned to you." />
-                  )}
-                  {freelancerJobs?.filter(j => j.status === 'Active').map((job, i) => (
+                  {MOCK_JOBS.filter(j => j.status === 'Active').map((job, i) => (
                     <JobRow key={job.id} job={job} index={i} />
                   ))}
                 </TabsContent>
                 <TabsContent value="completed" className="space-y-4">
-                  {!freelancerJobs?.filter(j => j.status === 'Completed').length && (
-                    <EmptyState message="No completed projects." />
-                  )}
-                  {freelancerJobs?.filter(j => j.status === 'Completed').map((job, i) => (
-                    <JobRow key={job.id} job={job} index={i} />
-                  ))}
+                  <EmptyState message="No completed projects yet." />
                 </TabsContent>
               </>
             )}
@@ -329,18 +294,17 @@ function EmptyState({ message, actionLink, actionText }: { message: string; acti
   );
 }
 
-function ApplicationRow({ application, index, db }: { application: any; index: number; db: any }) {
-  const jobRef = useMemoFirebase(() => {
-    if (!db || !application.jobId) return null;
-    return doc(db, "jobs", application.jobId);
-  }, [db, application.jobId]);
-  const { data: job } = useDoc(jobRef);
-
+function ApplicationRow({ application, index }: { application: any; index: number }) {
   const statusColors: Record<string, string> = {
     "Pending": "bg-yellow-500",
     "Shortlisted": "bg-accent",
     "Selected": "bg-green-500",
     "Rejected": "bg-destructive",
+  };
+
+  const jobTitleMap: Record<string, string> = {
+    "demo-job-1": "Next.js SaaS Dashboard",
+    "demo-job-2": "Technical Content Writer",
   };
 
   return (
@@ -355,7 +319,7 @@ function ApplicationRow({ application, index, db }: { application: any; index: n
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
                 <h3 className="text-lg font-bold group-hover:text-primary transition-colors">
-                  {job?.title || "Syncing Contract..."}
+                  {jobTitleMap[application.jobId] || "Syncing Contract..."}
                 </h3>
                 <Badge className={`${statusColors[application.status]} text-white border-none text-[10px]`}>
                   {application.status}

@@ -17,16 +17,11 @@ import {
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
-import { Search, Filter, Clock, Star, Check, Sparkles, Users } from "lucide-react";
+import { Search, Filter, Clock, Check, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import { 
-  useFirestore, 
-  useCollection, 
   useUser, 
-  useMemoFirebase,
-  addDocumentNonBlocking
 } from "@/firebase";
-import { collection, query, where, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 const MOCK_JOBS = [
@@ -69,7 +64,6 @@ const MOCK_JOBS = [
 ];
 
 export default function JobBoard() {
-  const db = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
@@ -77,23 +71,6 @@ export default function JobBoard() {
   const [coverNote, setCoverNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
-
-  const jobsQuery = useMemoFirebase(() => {
-    if (!db) return null;
-    return query(collection(db, "jobs"), where("isPublic", "==", true));
-  }, [db]);
-  const { data: firestoreJobs, isLoading: jobsLoading } = useCollection(jobsQuery);
-
-  const displayJobs = useMemo(() => {
-    const combined = [...(firestoreJobs || [])];
-    // Only add mock jobs if they don't exist in firestore (by ID check)
-    MOCK_JOBS.forEach(mock => {
-      if (!combined.find(j => j.id === mock.id)) {
-        combined.push(mock);
-      }
-    });
-    return combined;
-  }, [firestoreJobs]);
 
   const handleOpenApply = (job: any) => {
     if (!user) {
@@ -109,28 +86,9 @@ export default function JobBoard() {
   };
 
   const handleApply = () => {
-    if (!db || !user || !selectedJob) return;
-
     setIsSubmitting(true);
     
-    // For demo purposes, if it's a real job we write to DB
-    if (!selectedJob.isDemo) {
-      const appId = doc(collection(db, "temp")).id;
-      const applicationData = {
-        id: appId,
-        jobId: selectedJob.id,
-        freelancerId: user.uid,
-        jobClientId: selectedJob.clientId,
-        coverNote,
-        status: "Pending",
-        appliedAt: new Date().toISOString(),
-        isAIRecommended: false,
-        aiRecommendationReason: ""
-      };
-      addDocumentNonBlocking(collection(db, "jobs", selectedJob.id, "applications"), applicationData);
-    }
-    
-    // Immediate feedback
+    // Simulation
     setAppliedJobIds(prev => [...prev, selectedJob.id]);
     
     setTimeout(() => {
@@ -192,72 +150,68 @@ export default function JobBoard() {
           </div>
 
           <div className="md:col-span-3 space-y-4">
-            {jobsLoading ? (
-              <div className="p-12 text-center text-muted-foreground animate-pulse">Scanning open contracts...</div>
-            ) : (
-              displayJobs.map((job, i) => {
-                const isApplied = appliedJobIds.includes(job.id);
-                const applicantCount = job.applicantIds?.length || 0;
+            {MOCK_JOBS.map((job, i) => {
+              const isApplied = appliedJobIds.includes(job.id);
+              const applicantCount = job.applicantIds?.length || 0;
 
-                return (
-                  <motion.div
-                    key={job.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                  >
-                    <Card className="hover:border-primary/50 transition-all group overflow-hidden">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col md:flex-row justify-between gap-6">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                              <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                                {job.category}
-                              </Badge>
-                              <Badge variant="outline" className="border-border text-muted-foreground">
-                                <Users className="w-3 h-3 mr-1" />
-                                {applicantCount} applicants
-                              </Badge>
-                              <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto md:ml-0">
-                                <Clock className="w-3 h-3" /> {job.deadline}
-                              </span>
-                            </div>
-                            <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
-                              {job.title}
-                            </h3>
-                            <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
-                              {job.description}
-                            </p>
+              return (
+                <motion.div
+                  key={job.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <Card className="hover:border-primary/50 transition-all group overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex flex-col md:flex-row justify-between gap-6">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-3">
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
+                              {job.category}
+                            </Badge>
+                            <Badge variant="outline" className="border-border text-muted-foreground">
+                              <Users className="w-3 h-3 mr-1" />
+                              {applicantCount} applicants
+                            </Badge>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto md:ml-0">
+                              <Clock className="w-3 h-3" /> {job.deadline}
+                            </span>
                           </div>
-                          <div className="flex flex-row md:flex-col justify-between md:items-end gap-4 shrink-0">
-                            <div className="text-left md:text-right">
-                              <p className="text-2xl font-black text-foreground">{job.budget} GEN</p>
-                              <p className="text-xs text-muted-foreground uppercase tracking-widest">Fixed Price</p>
-                            </div>
-                            
-                            {isApplied ? (
-                              <Button variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20 cursor-default" disabled>
-                                <Check className="w-4 h-4 mr-2" />
-                                Applied
-                              </Button>
-                            ) : (
-                              <div className="flex gap-2">
-                                <Button asChild variant="ghost" className="text-xs">
-                                  <Link href={`/jobs/${job.id}`}>Details</Link>
-                                </Button>
-                                <Button onClick={() => handleOpenApply(job)} className="bg-primary px-8">
-                                  Apply Now
-                                </Button>
-                              </div>
-                            )}
-                          </div>
+                          <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
+                            {job.title}
+                          </h3>
+                          <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
+                            {job.description}
+                          </p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              })
-            )}
+                        <div className="flex flex-row md:flex-col justify-between md:items-end gap-4 shrink-0">
+                          <div className="text-left md:text-right">
+                            <p className="text-2xl font-black text-foreground">{job.budget} GEN</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-widest">Fixed Price</p>
+                          </div>
+                          
+                          {isApplied ? (
+                            <Button variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20 cursor-default" disabled>
+                              <Check className="w-4 h-4 mr-2" />
+                              Applied
+                            </Button>
+                          ) : (
+                            <div className="flex gap-2">
+                              <Button asChild variant="ghost" className="text-xs">
+                                <Link href={`/jobs/${job.id}`}>Details</Link>
+                              </Button>
+                              <Button onClick={() => handleOpenApply(job)} className="bg-primary px-8">
+                                Apply Now
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </div>
