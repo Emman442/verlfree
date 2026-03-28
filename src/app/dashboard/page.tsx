@@ -20,14 +20,6 @@ import {
   ArrowRight
 } from "lucide-react";
 import Link from "next/link";
-import { 
-  useFirestore, 
-  useUser, 
-  useMemoFirebase,
-  useDoc,
-  setDocumentNonBlocking,
-} from "@/firebase";
-import { doc } from "firebase/firestore";
 import { useState } from "react";
 
 // Mock Data for Demo Stability
@@ -42,15 +34,9 @@ const MOCK_JOBS = [
 ];
 
 export default function Dashboard() {
-  const db = useFirestore();
-  const { user } = useUser();
 
-  // Fetch User Profile to determine role (persistent)
-  const profileRef = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return doc(db, "userProfiles", user.uid);
-  }, [db, user]);
-  const { data: profile, isLoading: profileLoading } = useDoc(profileRef);
+const [profile, setProfile] = useState<any>(null);
+const [profileLoading, setProfileLoading] = useState(false);
 
   if (profileLoading) {
     return (
@@ -65,7 +51,8 @@ export default function Dashboard() {
 
   // Onboarding: No profile found
   if (!profile) {
-    return <RoleSelection user={user} db={db} />;
+    // return <RoleSelection user={user} db={db} />;
+    return (<> Nothing Found!</>)
   }
 
   const isClient = profile.role === "Client";
@@ -219,8 +206,6 @@ function RoleSelection({ user, db }: { user: any; db: any }) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-
-    setDocumentNonBlocking(doc(db, "userProfiles", user.uid), profileData, { merge: true });
   };
 
   return (

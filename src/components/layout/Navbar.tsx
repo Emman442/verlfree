@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Shield, Bell, Menu, X } from "lucide-react";
+import { Shield, Bell, Menu, X, Wallet } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import {HashLoader} from "react-spinners";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   DropdownMenu,
@@ -19,16 +20,50 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useUser, useAuth, initiateAnonymousSignIn } from "@/firebase";
-import { signOut } from "firebase/auth";
-
+import { useWallet } from "@/components/genlayer/wallet";
+import WalletConnect from "../genlayer/WalletConnect";
+import { useCheckIfProfileExists } from "@/hooks/useVerifree";
+import Modal from "../ui/modal";
+import { toast } from "sonner";
+import ProfileSetupModal from "@/app/register/page";
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  
-  const { user, isUserLoading } = useUser();
-  const auth = useAuth();
+  const {address} = useWallet();
+  const user = address ? {uid: address} : null;
+  const isUserLoading = false;
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
+  console.log(address)
+  const { isLoading, data: profileExists } = useCheckIfProfileExists(address);
+  console.log("Profile exists:", profileExists);
+
+
+  // Run check whenever address changes
+  useEffect(() => {
+    if (!address) {
+      setHasChecked(false);
+      setShowSetupModal(false);
+      return;
+    }
+
+    // Wait for loading to finish
+    if (isLoading) return;
+
+    // Only run once per address
+    if (hasChecked) return;
+
+    setHasChecked(true);
+
+    if (profileExists) {
+      toast.success("Welcome back!", {
+        description: `${address.slice(0, 6)}...${address.slice(-4)}`,
+      });
+    } else {
+      setShowSetupModal(true);
+    }
+  }, [address, isLoading, profileExists, hasChecked]);
 
   const [notifications, setNotifications] = useState([
     { id: 1, title: "Job Verified", description: "Your submission for 'NFT Market' was approved.", time: "2m ago" },
@@ -50,17 +85,40 @@ export default function Navbar() {
     { name: "Leaderboard", href: "/leaderboard" },
   ];
 
-  const handleConnect = () => {
-    initiateAnonymousSignIn(auth);
-  };
-
-  const handleDisconnect = () => {
-    signOut(auth);
-  };
-
   if (!mounted) return null;
 
   return (
+    <>
+     <Modal
+        isOpen={!!address && isLoading}
+        onClose={() => {}}
+        showCloseButton={false}
+        size="sm"
+      >
+        <div className="flex flex-col items-center gap-4 py-4">
+          <HashLoader size={40} color="#3C83F6" />
+          <div className="text-center space-y-1">
+            <p className="text-sm font-bold text-white">Checking your profile</p>
+            <p className="text-xs text-muted-foreground">
+              Connecting to GenLayer...
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {isLoading == false && <ProfileSetupModal
+        isOpen={showSetupModal}
+        onClose={() => setShowSetupModal(false)}
+        address={address || ""}
+        onProfileCreated={() => {
+          setShowSetupModal(false);
+          toast.success("Profile created!", {
+            description: "Welcome to VeriFree.",
+          });
+        }}
+      />}
+
+
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled ? "glass-navbar py-3" : "bg-transparent py-5"
@@ -141,6 +199,8 @@ export default function Navbar() {
             </PopoverContent>
           </Popover>
 
+          <div className="flex items-center gap-4">
+            <WalletConnect/>
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -161,20 +221,15 @@ export default function Navbar() {
                   <Link href="/leaderboard">Leaderboard</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleDisconnect} className="text-destructive cursor-pointer">
+                <DropdownMenuItem className="text-destructive cursor-pointer">
                   Disconnect Wallet
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button
-              onClick={handleConnect}
-              disabled={isUserLoading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 shadow-lg shadow-primary/20"
-            >
-              {isUserLoading ? "Connecting..." : "Connect Wallet"}
-            </Button>
+            <></>
           )}
+          </div>
 
           <button
             className="md:hidden text-foreground ml-2"
@@ -209,7 +264,6 @@ export default function Navbar() {
                 <Button 
                   className="w-full mt-4 h-12 text-lg font-bold" 
                   onClick={() => {
-                    handleConnect();
                     setMobileMenuOpen(false);
                   }}
                   disabled={isUserLoading}
@@ -222,6 +276,7 @@ export default function Navbar() {
         )}
       </AnimatePresence>
     </nav>
+    </>
   );
 }
 

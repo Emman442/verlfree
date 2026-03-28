@@ -1,11 +1,9 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { FirebaseClientProvider } from "@/firebase/client-provider";
-import { Toaster } from "@/components/ui/toaster";
-
+import type { Metadata } from 'next';
+import './globals.css';
+import { Providers } from './provider';
 export const metadata: Metadata = {
-  title: "VeriFree - Trustless Freelance Protocol",
-  description: "Automated escrow and AI-powered verification for the global workforce.",
+  title: 'VeriFree',
+  description: 'Decentralized freelance marketplace built on GenLayer, powered by AI and blockchain technology.',
 };
 
 export default function RootLayout({
@@ -21,10 +19,9 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
+        <Providers>
           {children}
-          <Toaster />
-        </FirebaseClientProvider>
+        </Providers>
       </body>
     </html>
   );
