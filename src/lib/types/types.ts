@@ -12,15 +12,39 @@ export interface UserProfile {
 }
 
 export interface Job {
-    id: string;
+    job_id: string;
     title: string;
     description: string;
     budget: string;
-    status: "open" | "in_progress" | "completed";
-    client_id: string;
-    freelancer_id?: string;
-    created_at: string;
-    updated_at: string;
+    status: "active" | "in_progress" | "completed" | "pending";
+    freelancer: string;
+    category: string;
+    deadline: string;
+    escrow_amount: string;
+    client: string;
+
+}
+
+export interface JobApplication {
+    job_id: string
+    title: string
+    description: string
+    category: string
+    client: string
+    freelancer: string
+    escrow_amount: string
+    deadline: string
+    is_public: boolean
+    status: string
+    deliverable_url: string
+    deliverable_note: string
+    ai_verdict: string
+    ai_reasoning: string
+    submitted_at: string
+    completed_at: string
+    created_at: string
+    ai_auto_assigned: boolean
+    ai_assignment_reason: string
 }
 
 

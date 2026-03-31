@@ -19,71 +19,21 @@ import {
 } from "@/components/ui/dialog";
 import { Search, Filter, Clock, Check, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
-import { 
-  useUser, 
-} from "@/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { useWallet } from "@/components/genlayer/wallet";
+import { toast } from "sonner";
+import { useGetJobs, useGetJobApplications } from "@/hooks/useVerifree";
+import JobCard from "@/components/ui/JobCard";
 
-const MOCK_JOBS = [
-  {
-    id: "demo-job-1",
-    title: "Build a Next.js 15 SaaS Dashboard",
-    category: "Web Development",
-    description: "Looking for a specialized developer to create a high-performance dashboard with real-time charting. Must use ShadCN UI and Tailwind CSS. The project requires complex state management and responsive design.",
-    budget: 1500,
-    deadline: "2024-06-15",
-    clientId: "demo-client-1",
-    isPublic: true,
-    applicantIds: ["u1", "u2", "u3"],
-    isDemo: true
-  },
-  {
-    id: "demo-job-2",
-    title: "Technical Content Writer for Web3",
-    category: "Content Writing",
-    description: "Write 10 deep-dive articles on decentralized protocols and AI agents. Must have a deep understanding of blockchain architecture and GenAI trends.",
-    budget: 800,
-    deadline: "2024-06-20",
-    clientId: "demo-client-2",
-    isPublic: true,
-    applicantIds: ["u4"],
-    isDemo: true
-  },
-  {
-    id: "demo-job-3",
-    title: "UI/UX Design for Mobile App",
-    category: "Design",
-    description: "Need a Figma expert to design a 15-screen mobile application for a travel startup. Focus on accessibility and modern aesthetics.",
-    budget: 1200,
-    deadline: "2024-07-01",
-    clientId: "demo-client-3",
-    isPublic: true,
-    applicantIds: ["u5", "u6"],
-    isDemo: true
-  }
-];
 
 export default function JobBoard() {
-  const { user } = useUser();
-  const { toast } = useToast();
+  const {isFetching, data: jobs} = useGetJobs()
+  const {address} = useWallet()
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [coverNote, setCoverNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [appliedJobIds, setAppliedJobIds] = useState<string[]>([]);
-
-  const handleOpenApply = (job: any) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please connect your wallet to apply for jobs.",
-        variant: "destructive"
-      });
-      return;
-    }
-    setSelectedJob(job);
-    setIsApplyModalOpen(true);
-  };
 
   const handleApply = () => {
     setIsSubmitting(true);
@@ -96,10 +46,10 @@ export default function JobBoard() {
       setIsApplyModalOpen(false);
       setCoverNote("");
       setSelectedJob(null);
-      toast({
-        title: "Application Submitted",
-        description: "Your proposal has been sent to the client.",
-      });
+      // toast({
+      //   title: "Application Submitted",
+      //   description: "Your proposal has been sent to the client.",
+      // });
     }, 1000);
   };
 
@@ -150,65 +100,18 @@ export default function JobBoard() {
           </div>
 
           <div className="md:col-span-3 space-y-4">
-            {MOCK_JOBS.map((job, i) => {
-              const isApplied = appliedJobIds.includes(job.id);
-              const applicantCount = job.applicantIds?.length || 0;
+            {jobs?.map((job, i) => {
+              
+              const applicantCount = job.job_id?.length || 0;
 
               return (
                 <motion.div
-                  key={job.id}
+                  key={job.job_id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
                 >
-                  <Card className="hover:border-primary/50 transition-all group overflow-hidden">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col md:flex-row justify-between gap-6">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-3">
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                              {job.category}
-                            </Badge>
-                            <Badge variant="outline" className="border-border text-muted-foreground">
-                              <Users className="w-3 h-3 mr-1" />
-                              {applicantCount} applicants
-                            </Badge>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1 ml-auto md:ml-0">
-                              <Clock className="w-3 h-3" /> {job.deadline}
-                            </span>
-                          </div>
-                          <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
-                            {job.title}
-                          </h3>
-                          <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
-                            {job.description}
-                          </p>
-                        </div>
-                        <div className="flex flex-row md:flex-col justify-between md:items-end gap-4 shrink-0">
-                          <div className="text-left md:text-right">
-                            <p className="text-2xl font-black text-foreground">{job.budget} GEN</p>
-                            <p className="text-xs text-muted-foreground uppercase tracking-widest">Fixed Price</p>
-                          </div>
-                          
-                          {isApplied ? (
-                            <Button variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20 cursor-default" disabled>
-                              <Check className="w-4 h-4 mr-2" />
-                              Applied
-                            </Button>
-                          ) : (
-                            <div className="flex gap-2">
-                              <Button asChild variant="ghost" className="text-xs">
-                                <Link href={`/jobs/${job.id}`}>Details</Link>
-                              </Button>
-                              <Button onClick={() => handleOpenApply(job)} className="bg-primary px-8">
-                                Apply Now
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                 <JobCard job={job} setSelectedJob={setSelectedJob} setIsApplyModalOpen={setIsApplyModalOpen} />
                 </motion.div>
               );
             })}

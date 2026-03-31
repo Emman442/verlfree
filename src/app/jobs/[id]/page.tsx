@@ -23,16 +23,9 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { 
-  useFirestore, 
-  useDoc, 
-  useCollection, 
-  useUser, 
-  useMemoFirebase,
-  updateDocumentNonBlocking
-} from "@/firebase";
-import { doc, collection } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import { useWallet } from "@/components/genlayer/wallet";
+import { useJobByID } from "@/hooks/useVerifree";
 
 // Demo Data Fallback
 const MOCK_JOB_DATA: Record<string, any> = {
@@ -58,95 +51,42 @@ const MOCK_APPLICATIONS = [
 
 export default function JobDetail() {
   const { id } = useParams();
-  const db = useFirestore();
-  const { user } = useUser();
-  const { toast } = useToast();
-  
   const [verifying, setVerifying] = useState(false);
   const [isAIReordering, setIsAIReordering] = useState(false);
   const [deliverableUrl, setDeliverableUrl] = useState("");
-  const [localJobState, setLocalJobState] = useState<any>(null);
   const [localApps, setLocalApps] = useState(MOCK_APPLICATIONS);
+  const { address } = useWallet();
+  const {isFetching: jobLoading, data: jobData} = useJobByID(id as string);
 
-  // Firestore Fetch
-  const jobRef = useMemoFirebase(() => {
-    if (!db || !id || (id as string).startsWith('demo-')) return null;
-    return doc(db, "jobs", id as string);
-  }, [db, id]);
-  const { data: firestoreJob, isLoading: jobLoading } = useDoc(jobRef);
 
-  // Sync Local State with Firestore or Mock
-  useEffect(() => {
-    if (firestoreJob) {
-      setLocalJobState(firestoreJob);
-    } else if (id && MOCK_JOB_DATA[id as string]) {
-      setLocalJobState(MOCK_JOB_DATA[id as string]);
-    }
-  }, [firestoreJob, id]);
+  const isClient = address && (jobData?.client == address);
+  const isAssignedFreelancer = address && jobData?.freelancer === address;
 
-  const isClient = user && (localJobState?.clientId === user.uid || (id as string).startsWith('demo-'));
-  const isAssignedFreelancer = user && localJobState?.assignedFreelancerId === user.uid;
+  // const handleAIShortlist = () => {
+  //   setIsAIReordering(true);
 
-  const handleAIShortlist = () => {
-    setIsAIReordering(true);
-    toast({
-      title: "AI Analyzing Applicants",
-      description: "Comparing cover notes, skills, and on-chain history...",
-    });
     
-    setTimeout(() => {
-      const reordered = [...localApps].sort((a, b) => (a.isAIRecommended ? -1 : 1));
-      setLocalApps(reordered);
-      setIsAIReordering(false);
-      toast({
-        title: "Shortlist Complete",
-        description: "Found the best fit for your requirements.",
-      });
-    }, 2000);
-  };
+  //   setTimeout(() => {
+  //     const reordered = [...localApps].sort((a, b) => (a.isAIRecommended ? -1 : 1));
+  //     setLocalApps(reordered);
+  //     setIsAIReordering(false);
+  //     toast({
+  //       title: "Shortlist Complete",
+  //       description: "Found the best fit for your requirements.",
+  //     });
+  //   }, 2000);
+  // };
 
-  const handleSelectFreelancer = (app: any) => {
-    if ((id as string).startsWith('demo-')) {
-      setLocalJobState({ ...localJobState, status: "Active", assignedFreelancerId: app.freelancerId });
-      setLocalApps(localApps.map(a => ({ ...a, status: a.id === app.id ? "Selected" : "Rejected" })));
-    } else if (db && localJobState) {
-      updateDocumentNonBlocking(doc(db, "jobs", localJobState.id), {
-        status: "Active",
-        assignedFreelancerId: app.freelancerId,
-        updatedAt: new Date().toISOString()
-      });
-    }
+  // const handleSelectFreelancer = (app: any) => { }
 
-    toast({
-      title: "Freelancer Selected",
-      description: `Project is now Active. Payout locked in escrow.`,
-    });
-  };
+  //   toast(`Project is now Active. Payout locked in escrow.`);
+  // };
 
-  const handleRejectApplicant = (appId: string) => {
-    setLocalApps(localApps.map(a => a.id === appId ? { ...a, status: "Rejected" } : a));
-    toast({
-      title: "Application Rejected",
-      description: "Candidate has been notified via the protocol.",
-    });
-  };
+  // const handleRejectApplicant = (appId: string) => {
 
-  const handleSubmitDeliverable = () => {
-    if (!deliverableUrl) return;
-    setVerifying(true);
-    toast({
-      title: "Submitting Deliverable",
-      description: "Triggering protocol AI verification node...",
-    });
-    
-    setTimeout(() => {
-      setVerifying(false);
-      toast({
-        title: "Deliverable Received",
-        description: "AI Review is in progress. Check back shortly.",
-      });
-    }, 2000);
-  };
+  // };
+
+  // const handleSubmitDeliverable = () => {}
 
   const successCriteria = [
     "Fully responsive on mobile and desktop",
@@ -155,7 +95,7 @@ export default function JobDetail() {
     "Clean code structure with modular components"
   ];
 
-  if (jobLoading && !localJobState) {
+  if (jobLoading && !jobData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -166,7 +106,7 @@ export default function JobDetail() {
     );
   }
 
-  if (!localJobState) {
+  if (!jobData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -192,22 +132,22 @@ export default function JobDetail() {
               animate={{ opacity: 1, y: 0 }}
             >
               <div className="flex items-center gap-3 mb-4">
-                <Badge className="bg-primary/10 text-primary border-none">{localJobState.category}</Badge>
+                <Badge className="bg-primary/10 text-primary border-none">{jobData.category}</Badge>
                 <Badge variant="outline" className={`
-                  ${localJobState.status === 'Active' ? 'text-blue-500 border-blue-500/50' : 
-                    localJobState.status === 'Completed' ? 'text-green-500 border-green-500/50' : 
+                  ${jobData.status === 'active' ? 'text-blue-500 border-blue-500/50' : 
+                    jobData.status === 'completed' ? 'text-green-500 border-green-500/50' : 
                     'text-yellow-500 border-yellow-500/50'}
                 `}>
-                  {localJobState.status}
+                  {jobData.status}
                 </Badge>
               </div>
-              <h1 className="text-4xl font-extrabold mb-4 tracking-tight">{localJobState.title}</h1>
+              <h1 className="text-4xl font-extrabold mb-4 tracking-tight">{jobData.title}</h1>
               <p className="text-muted-foreground text-lg leading-relaxed mb-6">
-                {localJobState.description}
+                {jobData.description}
               </p>
             </motion.div>
 
-            {isClient && localJobState.status === "Open" && (
+            {isClient && jobData.status === "active" && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -218,7 +158,7 @@ export default function JobDetail() {
                     variant="outline" 
                     size="sm" 
                     className="border-primary/50 text-primary hover:bg-primary/10"
-                    onClick={handleAIShortlist}
+                    // onClick={handleAIShortlist}
                     disabled={isAIReordering || !localApps.length}
                   >
                     <Sparkles className={`w-4 h-4 mr-2 ${isAIReordering ? 'animate-spin' : ''}`} />
@@ -271,7 +211,7 @@ export default function JobDetail() {
                                 variant="outline" 
                                 size="sm" 
                                 className="text-destructive hover:bg-destructive/10"
-                                onClick={() => handleRejectApplicant(app.id)}
+                                // onClick={() => handleRejectApplicant(app.id)}
                               >
                                 <XCircle className="w-4 h-4 mr-2" />
                                 Reject
@@ -279,7 +219,7 @@ export default function JobDetail() {
                               <Button 
                                 size="sm" 
                                 className="bg-primary"
-                                onClick={() => handleSelectFreelancer(app)}
+                                // onClick={() => handleSelectFreelancer(app)}
                               >
                                 <ShieldCheck className="w-4 h-4 mr-2" />
                                 Select
@@ -299,7 +239,7 @@ export default function JobDetail() {
               </Card>
             )}
 
-            {localJobState.status === "Active" && (
+            {jobData.status === "active" && (
               <Card className="border-primary/20 bg-primary/5">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -321,7 +261,7 @@ export default function JobDetail() {
                         <p className="text-xs text-muted-foreground">AI will automatically crawl this link to verify against success criteria.</p>
                       </div>
                       <Button 
-                        onClick={handleSubmitDeliverable} 
+                        // onClick={handleSubmitDeliverable} 
                         disabled={!deliverableUrl || verifying}
                         className="w-full bg-primary py-6 text-lg font-bold"
                       >
@@ -357,10 +297,10 @@ export default function JobDetail() {
                     </div>
                     <div>
                       <p className="text-sm font-bold">Contract Initialized</p>
-                      <p className="text-xs text-muted-foreground">{new Date(localJobState.createdAt).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(Date.now()).toLocaleString()}</p>
                     </div>
                   </div>
-                  {localJobState.status === 'Active' && (
+                  {jobData.status === 'active' && (
                     <div className="flex gap-4 items-start">
                       <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
                         <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -384,11 +324,11 @@ export default function JobDetail() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground text-sm">Escrow Amount</span>
-                  <span className="font-bold text-lg">{localJobState.budget} GEN</span>
+                  <span className="font-bold text-lg">{jobData.escrow_amount} GEN</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border">
                   <span className="text-muted-foreground text-sm">Deadline</span>
-                  <span className="font-bold text-sm">{localJobState.deadline}</span>
+                  <span className="font-bold text-sm">{jobData.deadline}</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-muted-foreground text-sm">Protocol Fee</span>
